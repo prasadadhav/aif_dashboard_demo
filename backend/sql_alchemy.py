@@ -298,7 +298,7 @@ Derived.baseMetric: Mapped[List["Metric"]] = relationship("Metric", secondary=de
 MetricCategory.metrics: Mapped[List["Metric"]] = relationship("Metric", secondary=metriccategory_metric, back_populates="category")
 
 # Database connection
-DATABASE_URL = "sqlite:///ai_sandbox_PSA_13_Jan_2026.db"  # SQLite connection
+DATABASE_URL = "sqlite:///ai_sandbox_PSA_16_Oct_2025_Cedric_v2.db"  # SQLite connection
 engine = create_engine(DATABASE_URL, echo=True)
 
 # Create tables in the database

@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 ############################################
 
 def init_db():
-    SQLALCHEMY_DATABASE_URL = "sqlite:///./ai_sandbox_PSA_13_Jan_2026.db"
+    SQLALCHEMY_DATABASE_URL = "sqlite:///./ai_sandbox_PSA_16_Oct_2025_Cedric_v2.db"
     engine = create_engine(
         SQLALCHEMY_DATABASE_URL, 
         connect_args={"check_same_thread": False},
