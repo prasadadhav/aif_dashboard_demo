@@ -44,16 +44,25 @@ export const Renderer: React.FC<RendererProps> = ({ component, styles }) => {
         // Always use backend base URL for relative endpoints
         const backendBase = "http://localhost:8000";
         
-        // Check if table has lookup columns - if so, request detailed data with joins
-        const hasLookupColumns = component.chart?.columns?.some(
-          (col: any) => typeof col === 'object' && col.column_type === 'lookup'
-        );
+        // Build URL with filter parameters if provided
+        let url = endpoint.startsWith("/") 
+          ? backendBase + endpoint
+          : endpoint;
         
-        // Add detailed=true query param if there are lookup columns
-        const urlParams = hasLookupColumns ? '?detailed=true' : '';
-        const url = endpoint.startsWith("/") 
-          ? backendBase + endpoint + urlParams
-          : endpoint + urlParams;
+        // Add filter parameters from data_binding.filters
+        const filters = component.data_binding?.filters;
+        if (filters && typeof filters === 'object') {
+          const queryParams = new URLSearchParams();
+          Object.entries(filters).forEach(([key, value]) => {
+            if (value !== null && value !== undefined) {
+              queryParams.append(key, String(value));
+            }
+          });
+          const queryString = queryParams.toString();
+          if (queryString) {
+            url += (url.includes('?') ? '&' : '?') + queryString;
+          }
+        }
         
         axios.get(url)
           .then((res) => {
@@ -403,9 +412,13 @@ export const Renderer: React.FC<RendererProps> = ({ component, styles }) => {
     if (loading) return <div id={component.id}>Loading data...</div>;
     if (error) return <div id={component.id}>{error}</div>;
     
-    // Use configured field names from data_binding, with intelligent fallback
-    let actualLabelField = component.data_binding?.label_field || "name";
-    let actualDataField = component.data_binding?.data_field || "value";
+    // Use configured field names from attributes or data_binding
+    let actualLabelField = component.attributes?.["label-field"] || 
+                          component.data_binding?.label_field || 
+                          "name";
+    let actualDataField = component.attributes?.["data-field"] || 
+                         component.data_binding?.data_field || 
+                         "value";
     
     // If data_binding fields look like UUIDs (contain hyphens and are long), detect from data
     const isUUID = (str: string) => str && str.length > 20 && str.includes('-');
@@ -449,9 +462,13 @@ export const Renderer: React.FC<RendererProps> = ({ component, styles }) => {
     if (loading) return <div id={component.id}>Loading data...</div>;
     if (error) return <div id={component.id}>{error}</div>;
     
-    // Use configured field names from data_binding, with intelligent fallback
-    let actualLabelField = component.data_binding?.label_field || "name";
-    let actualDataField = component.data_binding?.data_field || "value";
+    // Use configured field names from attributes or data_binding
+    let actualLabelField = component.attributes?.["label-field"] || 
+                          component.data_binding?.label_field || 
+                          "name";
+    let actualDataField = component.attributes?.["data-field"] || 
+                         component.data_binding?.data_field || 
+                         "value";
     
     // If data_binding fields look like UUIDs (contain hyphens and are long), detect from data
     const isUUID = (str: string) => str && str.length > 20 && str.includes('-');
@@ -495,9 +512,13 @@ export const Renderer: React.FC<RendererProps> = ({ component, styles }) => {
     if (loading) return <div id={component.id}>Loading data...</div>;
     if (error) return <div id={component.id}>{error}</div>;
     
-    // Use configured field names from data_binding, with intelligent fallback
-    let actualLabelField = component.data_binding?.label_field || "name";
-    let actualDataField = component.data_binding?.data_field || "value";
+    // Use configured field names from attributes or data_binding
+    let actualLabelField = component.attributes?.["label-field"] || 
+                          component.data_binding?.label_field || 
+                          "name";
+    let actualDataField = component.attributes?.["data-field"] || 
+                         component.data_binding?.data_field || 
+                         "value";
     
     // If data_binding fields look like UUIDs (contain hyphens and are long), detect from data
     const isUUID = (str: string) => str && str.length > 20 && str.includes('-');
