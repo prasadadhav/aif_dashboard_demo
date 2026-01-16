@@ -82,10 +82,10 @@
                     "chart-color": "#4CAF50",
                     "chart-title": "Line Chart",
                     "curve-type": "monotone",
-                    "data-field": "c1748cab-b490-4f3a-831e-0568ca940062",
+                    "data-field": "value",
                     "data-source": "a2546a91-1913-4cac-86ac-283c39218a3a",
                     "id": "i1cekk",
-                    "label-field": "c1748cab-b490-4f3a-831e-0568ca940062",
+                    "label-field": "metric_id",
                     "line-width": "2",
                     "series": "[{\"name\":\"Series 1\",\"color\":\"#4CAF50\",\"data\":[{\"name\":\"Category A\",\"value\":40},{\"name\":\"Category B\",\"value\":65},{\"name\":\"Category C\",\"value\":85},{\"name\":\"Category D\",\"value\":55},{\"name\":\"Category E\",\"value\":75}],\"dataSource\":\"a2546a91-1913-4cac-86ac-283c39218a3a\",\"labelField\":\"d6a622b9-2432-4411-a3f2-5815dff2085e\",\"dataField\":\"c1748cab-b490-4f3a-831e-0568ca940062\",\"filter\":\"evaluation.observation[0].measure.find(m => m.metric.name === 'B2 Total')?.value\\\"\",\"data-source\":\"a2546a91-1913-4cac-86ac-283c39218a3a\",\"label-field\":\"d6a622b9-2432-4411-a3f2-5815dff2085e\",\"data-field\":\"c1748cab-b490-4f3a-831e-0568ca940062\"},{\"name\":\"Series 2\",\"color\":\"#0088FE\",\"data\":[{\"name\":\"Category A\",\"value\":79},{\"name\":\"Category B\",\"value\":77},{\"name\":\"Category C\",\"value\":62},{\"name\":\"Category D\",\"value\":63},{\"name\":\"Category E\",\"value\":76}],\"dataSource\":\"a2546a91-1913-4cac-86ac-283c39218a3a\",\"labelField\":\"d6a622b9-2432-4411-a3f2-5815dff2085e\",\"dataField\":\"c1748cab-b490-4f3a-831e-0568ca940062\",\"data-source\":\"a2546a91-1913-4cac-86ac-283c39218a3a\",\"label-field\":\"d6a622b9-2432-4411-a3f2-5815dff2085e\",\"data-field\":\"c1748cab-b490-4f3a-831e-0568ca940062\"}]",
                     "show-grid": true,
@@ -108,6 +108,12 @@
                     "has-data-binding"
                   ],
                   "color": "#4CAF50",
+                  "data_binding": {
+                    "endpoint": "/measure/",
+                    "filters": {
+                      "metric_id": 1
+                    }
+                  },
                   "display_order": 0,
                   "id": "i1cekk",
                   "name": "Line Chart",
@@ -134,10 +140,10 @@
                     "bar-width": 30,
                     "chart-color": "#3498db",
                     "chart-title": "Bar Chart Title",
-                    "data-field": "c1748cab-b490-4f3a-831e-0568ca940062",
+                    "data-field": "value",
                     "data-source": "a2546a91-1913-4cac-86ac-283c39218a3a",
                     "id": "ig71rx",
-                    "label-field": "",
+                    "label-field": "metric_id",
                     "orientation": "vertical",
                     "series": "[{\"name\":\"Series 1\",\"color\":\"#3498db\",\"data\":[{\"name\":\"Category A\",\"value\":40},{\"name\":\"Category B\",\"value\":65},{\"name\":\"Category C\",\"value\":85},{\"name\":\"Category D\",\"value\":55},{\"name\":\"Category E\",\"value\":75}],\"dataSource\":\"a2546a91-1913-4cac-86ac-283c39218a3a\",\"labelField\":\"d6a622b9-2432-4411-a3f2-5815dff2085e\",\"dataField\":\"c1748cab-b490-4f3a-831e-0568ca940062\",\"filter\":\"evaluation.observation[0].measure.find(m => m.metric.name === 'B2 Total')?.value\\\"\",\"data-source\":\"a2546a91-1913-4cac-86ac-283c39218a3a\",\"label-field\":\"d6a622b9-2432-4411-a3f2-5815dff2085e\",\"data-field\":\"c1748cab-b490-4f3a-831e-0568ca940062\"},{\"name\":\"Series 2\",\"color\":\"#F39C12\",\"data\":[{\"name\":\"Category A\",\"value\":75},{\"name\":\"Category B\",\"value\":43},{\"name\":\"Category C\",\"value\":68},{\"name\":\"Category D\",\"value\":68},{\"name\":\"Category E\",\"value\":51}],\"dataSource\":\"a2546a91-1913-4cac-86ac-283c39218a3a\",\"labelField\":\"d6a622b9-2432-4411-a3f2-5815dff2085e\",\"dataField\":\"c1748cab-b490-4f3a-831e-0568ca940062\",\"filter\":\"evaluation.observation[0].measure.find(m => m.metric.name === 'C1 Total')?.value\\\"\",\"data-source\":\"a2546a91-1913-4cac-86ac-283c39218a3a\",\"label-field\":\"d6a622b9-2432-4411-a3f2-5815dff2085e\",\"data-field\":\"c1748cab-b490-4f3a-831e-0568ca940062\"}]",
                     "show-grid": true,
@@ -161,6 +167,12 @@
                     "has-data-binding"
                   ],
                   "color": "#3498db",
+                  "data_binding": {
+                    "endpoint": "/measure/",
+                    "filters": {
+                      "metric_id": 1
+                    }
+                  },
                   "display_order": 0,
                   "id": "ig71rx",
                   "name": "Bar Chart Title",
@@ -183,7 +195,7 @@
                   "attributes": {
                     "chart-color": "#8884d8",
                     "chart-title": "Radar Chart",
-                    "data-field": "c1748cab-b490-4f3a-831e-0568ca940062",
+                    "data-field": "value",
                     "data-source": "a2546a91-1913-4cac-86ac-283c39218a3a",
                     "id": "irekdw",
                     "label-field": "c1748cab-b490-4f3a-831e-0568ca940062",
