@@ -219,6 +219,12 @@
                     "has-data-binding"
                   ],
                   "color": "#8884d8",
+                  "data_binding": {
+                    "endpoint": "/measure/",
+                    "filters": {
+                      "metric_id": 1
+                    }
+                  },
                   "display_order": 0,
                   "id": "irekdw",
                   "name": "Radar Chart",
