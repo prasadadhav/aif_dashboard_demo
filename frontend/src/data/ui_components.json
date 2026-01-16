@@ -249,7 +249,7 @@
           "attributes": {
             "action-buttons": true,
             "chart-color": "#2c3e50",
-            "chart-title": "Table Displaying Measure",
+            "chart-title": "Table Displaying Metric",
             "data-source": "d6a622b9-2432-4411-a3f2-5815dff2085e",
             "id": "ilkggl",
             "rows-per-page": 5,
@@ -318,8 +318,8 @@
           },
           "display_order": 2,
           "id": "ilkggl",
-          "name": "Table Displaying Measure",
-          "title": "Table Displaying Measure",
+          "name": "Table Displaying Metric",
+          "title": "Table Displaying Metric",
           "type": "table"
         },
         {
