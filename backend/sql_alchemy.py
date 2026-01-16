@@ -14,36 +14,36 @@ class Base(DeclarativeBase):
     pass
 
 # Definitions of Enumerations
-class EvaluationStatus(enum.Enum):
-    Processing = "Processing"
-    Pending = "Pending"
-    Archived = "Archived"
-    Custom = "Custom"
-    Done = "Done"
-
-class DatasetType(enum.Enum):
-    Validation = "Validation"
-    Test = "Test"
-    Training = "Training"
-
 class ProjectStatus(enum.Enum):
-    Ready = "Ready"
+    Archived = "Archived"
     Created = "Created"
     Closed = "Closed"
     Pending = "Pending"
-    Archived = "Archived"
+    Ready = "Ready"
 
 class LicensingType(enum.Enum):
-    Open_source = "Open_source"
     Proprietary = "Proprietary"
+    Open_source = "Open_source"
+
+class DatasetType(enum.Enum):
+    Training = "Training"
+    Validation = "Validation"
+    Test = "Test"
+
+class EvaluationStatus(enum.Enum):
+    Archived = "Archived"
+    Processing = "Processing"
+    Done = "Done"
+    Custom = "Custom"
+    Pending = "Pending"
 
 
 # Tables definition for many-to-many relationships
-metriccategory_metric = Table(
-    "metriccategory_metric",
+derived_metric = Table(
+    "derived_metric",
     Base.metadata,
-    Column("metrics", ForeignKey("metric.id"), primary_key=True),
-    Column("category", ForeignKey("metriccategory.id"), primary_key=True),
+    Column("baseMetric", ForeignKey("metric.id"), primary_key=True),
+    Column("derivedBy", ForeignKey("derived.id"), primary_key=True),
 )
 evaluation_element = Table(
     "evaluation_element",
@@ -54,14 +54,14 @@ evaluation_element = Table(
 evaluates_eval = Table(
     "evaluates_eval",
     Base.metadata,
-    Column("evalu", ForeignKey("evaluation.id"), primary_key=True),
     Column("evaluates", ForeignKey("element.id"), primary_key=True),
+    Column("evalu", ForeignKey("evaluation.id"), primary_key=True),
 )
-derived_metric = Table(
-    "derived_metric",
+metriccategory_metric = Table(
+    "metriccategory_metric",
     Base.metadata,
-    Column("baseMetric", ForeignKey("metric.id"), primary_key=True),
-    Column("derivedBy", ForeignKey("derived.id"), primary_key=True),
+    Column("metrics", ForeignKey("metric.id"), primary_key=True),
+    Column("category", ForeignKey("metriccategory.id"), primary_key=True),
 )
 
 # Tables definition
@@ -76,10 +76,10 @@ class LegalRequirement(Base):
 class Tool(Base):
     __tablename__ = "tool"
     id: Mapped[int] = mapped_column(primary_key=True)
-    source: Mapped[str] = mapped_column(String(100))
-    version: Mapped[str] = mapped_column(String(100))
     name: Mapped[str] = mapped_column(String(100))
     licensing: Mapped[LicensingType] = mapped_column(Enum(LicensingType))
+    source: Mapped[str] = mapped_column(String(100))
+    version: Mapped[str] = mapped_column(String(100))
 
 class Datashape(Base):
     __tablename__ = "datashape"
@@ -102,38 +102,49 @@ class Evaluation(Base):
 class Measure(Base):
     __tablename__ = "measure"
     id: Mapped[int] = mapped_column(primary_key=True)
-    uncertainty: Mapped[float] = mapped_column(Float)
-    unit: Mapped[str] = mapped_column(String(100))
     value: Mapped[float] = mapped_column(Float)
     error: Mapped[str] = mapped_column(String(100))
-    metric_id: Mapped[int] = mapped_column(ForeignKey("metric.id"))
-    measurand_id: Mapped[int] = mapped_column(ForeignKey("element.id"))
+    uncertainty: Mapped[float] = mapped_column(Float)
+    unit: Mapped[str] = mapped_column(String(100))
     observation_id: Mapped[int] = mapped_column(ForeignKey("observation.id"))
+    measurand_id: Mapped[int] = mapped_column(ForeignKey("element.id"))
+    metric_id: Mapped[int] = mapped_column(ForeignKey("metric.id"))
 
 class AssessmentElement(AbstractConcreteBase, Base):
     strict_attrs = True
     id: Mapped[int] = mapped_column(primary_key=True)
-    name: Mapped[str] = mapped_column(String(100))
     description: Mapped[str] = mapped_column(String(100))
-
-class Configuration(AssessmentElement):
-    __tablename__ = "configuration"
-    id: Mapped[int] = mapped_column(primary_key=True)
-    __mapper_args__ = {
-        "polymorphic_identity": "configuration",
-        "concrete": True,
-    }
+    name: Mapped[str] = mapped_column(String(100))
 
 class Observation(AssessmentElement):
     __tablename__ = "observation"
     id: Mapped[int] = mapped_column(primary_key=True)
     observer: Mapped[str] = mapped_column(String(100))
     whenObserved: Mapped[dt_datetime] = mapped_column(DateTime)
-    tool_id: Mapped[int] = mapped_column(ForeignKey("tool.id"))
     dataset_id: Mapped[int] = mapped_column(ForeignKey("dataset.id"))
+    tool_id: Mapped[int] = mapped_column(ForeignKey("tool.id"))
     eval_id: Mapped[int] = mapped_column(ForeignKey("evaluation.id"))
     __mapper_args__ = {
         "polymorphic_identity": "observation",
+        "concrete": True,
+    }
+
+class ConfParam(AssessmentElement):
+    __tablename__ = "confparam"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    param_type: Mapped[str] = mapped_column(String(100))
+    value: Mapped[str] = mapped_column(String(100))
+    conf_id: Mapped[int] = mapped_column(ForeignKey("configuration.id"))
+    __mapper_args__ = {
+        "polymorphic_identity": "confparam",
+        "concrete": True,
+    }
+
+class Configuration(AssessmentElement):
+    __tablename__ = "configuration"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    __mapper_args__ = {
+        "polymorphic_identity": "configuration",
         "concrete": True,
     }
 
@@ -145,6 +156,18 @@ class Element(AssessmentElement):
     __mapper_args__ = {
         "polymorphic_identity": "element",
         "polymorphic_on": "type_spec",
+    }
+
+class Dataset(Element):
+    __tablename__ = "dataset"
+    id: Mapped[int] = mapped_column(ForeignKey("element.id"), primary_key=True)
+    source: Mapped[str] = mapped_column(String(100))
+    version: Mapped[str] = mapped_column(String(100))
+    licensing: Mapped[LicensingType] = mapped_column(Enum(LicensingType))
+    dataset_type: Mapped[DatasetType] = mapped_column(Enum(DatasetType))
+    datashape_id: Mapped[int] = mapped_column(ForeignKey("datashape.id"))
+    __mapper_args__ = {
+        "polymorphic_identity": "dataset",
     }
 
 class Model(Element):
@@ -169,29 +192,6 @@ class Feature(Element):
     date_id: Mapped[int] = mapped_column(ForeignKey("datashape.id"))
     __mapper_args__ = {
         "polymorphic_identity": "feature",
-    }
-
-class Dataset(Element):
-    __tablename__ = "dataset"
-    id: Mapped[int] = mapped_column(ForeignKey("element.id"), primary_key=True)
-    source: Mapped[str] = mapped_column(String(100))
-    version: Mapped[str] = mapped_column(String(100))
-    licensing: Mapped[LicensingType] = mapped_column(Enum(LicensingType))
-    dataset_type: Mapped[DatasetType] = mapped_column(Enum(DatasetType))
-    datashape_id: Mapped[int] = mapped_column(ForeignKey("datashape.id"))
-    __mapper_args__ = {
-        "polymorphic_identity": "dataset",
-    }
-
-class ConfParam(AssessmentElement):
-    __tablename__ = "confparam"
-    id: Mapped[int] = mapped_column(primary_key=True)
-    param_type: Mapped[str] = mapped_column(String(100))
-    value: Mapped[str] = mapped_column(String(100))
-    conf_id: Mapped[int] = mapped_column(ForeignKey("configuration.id"))
-    __mapper_args__ = {
-        "polymorphic_identity": "confparam",
-        "concrete": True,
     }
 
 class Metric(AssessmentElement):
@@ -234,9 +234,9 @@ LegalRequirement.project_1: Mapped["Project"] = relationship("Project", back_pop
 Tool.observation_1: Mapped[List["Observation"]] = relationship("Observation", back_populates="tool", foreign_keys=[Observation.tool_id])
 
 #--- Relationships of the datashape table
-Datashape.dataset_1: Mapped[List["Dataset"]] = relationship("Dataset", back_populates="datashape", foreign_keys=[Dataset.datashape_id])
-Datashape.f_date: Mapped[List["Feature"]] = relationship("Feature", back_populates="date", foreign_keys=[Feature.date_id])
 Datashape.f_features: Mapped[List["Feature"]] = relationship("Feature", back_populates="features", foreign_keys=[Feature.features_id])
+Datashape.f_date: Mapped[List["Feature"]] = relationship("Feature", back_populates="date", foreign_keys=[Feature.date_id])
+Datashape.dataset_1: Mapped[List["Dataset"]] = relationship("Dataset", back_populates="datashape", foreign_keys=[Dataset.datashape_id])
 
 #--- Relationships of the project table
 Project.involves: Mapped[List["Element"]] = relationship("Element", back_populates="project", foreign_keys=[Element.project_id])
@@ -246,30 +246,38 @@ Project.eval: Mapped[List["Evaluation"]] = relationship("Evaluation", back_popul
 #--- Relationships of the evaluation table
 Evaluation.config: Mapped["Configuration"] = relationship("Configuration", back_populates="eval", foreign_keys=[Evaluation.config_id])
 Evaluation.project: Mapped["Project"] = relationship("Project", back_populates="eval", foreign_keys=[Evaluation.project_id])
+Evaluation.evaluates: Mapped[List["Element"]] = relationship("Element", secondary=evaluates_eval, back_populates="evalu")
 Evaluation.observations: Mapped[List["Observation"]] = relationship("Observation", back_populates="eval", foreign_keys=[Observation.eval_id])
 Evaluation.ref: Mapped[List["Element"]] = relationship("Element", secondary=evaluation_element, back_populates="eval")
-Evaluation.evaluates: Mapped[List["Element"]] = relationship("Element", secondary=evaluates_eval, back_populates="evalu")
 
 #--- Relationships of the measure table
-Measure.metric: Mapped["Metric"] = relationship("Metric", back_populates="measures", foreign_keys=[Measure.metric_id])
-Measure.measurand: Mapped["Element"] = relationship("Element", back_populates="measure", foreign_keys=[Measure.measurand_id])
 Measure.observation: Mapped["Observation"] = relationship("Observation", back_populates="measures", foreign_keys=[Measure.observation_id])
+Measure.measurand: Mapped["Element"] = relationship("Element", back_populates="measure", foreign_keys=[Measure.measurand_id])
+Measure.metric: Mapped["Metric"] = relationship("Metric", back_populates="measures", foreign_keys=[Measure.metric_id])
+
+#--- Relationships of the observation table
+Observation.measures: Mapped[List["Measure"]] = relationship("Measure", back_populates="observation", foreign_keys=[Measure.observation_id])
+Observation.dataset: Mapped["Dataset"] = relationship("Dataset", back_populates="observation_2", foreign_keys=[Observation.dataset_id])
+Observation.tool: Mapped["Tool"] = relationship("Tool", back_populates="observation_1", foreign_keys=[Observation.tool_id])
+Observation.eval: Mapped["Evaluation"] = relationship("Evaluation", back_populates="observations", foreign_keys=[Observation.eval_id])
+
+#--- Relationships of the confparam table
+ConfParam.conf: Mapped["Configuration"] = relationship("Configuration", back_populates="params", foreign_keys=[ConfParam.conf_id])
 
 #--- Relationships of the configuration table
 Configuration.params: Mapped[List["ConfParam"]] = relationship("ConfParam", back_populates="conf", foreign_keys=[ConfParam.conf_id])
 Configuration.eval: Mapped[List["Evaluation"]] = relationship("Evaluation", back_populates="config", foreign_keys=[Evaluation.config_id])
 
-#--- Relationships of the observation table
-Observation.measures: Mapped[List["Measure"]] = relationship("Measure", back_populates="observation", foreign_keys=[Measure.observation_id])
-Observation.tool: Mapped["Tool"] = relationship("Tool", back_populates="observation_1", foreign_keys=[Observation.tool_id])
-Observation.dataset: Mapped["Dataset"] = relationship("Dataset", back_populates="observation_2", foreign_keys=[Observation.dataset_id])
-Observation.eval: Mapped["Evaluation"] = relationship("Evaluation", back_populates="observations", foreign_keys=[Observation.eval_id])
-
 #--- Relationships of the element table
-Element.evalu: Mapped[List["Evaluation"]] = relationship("Evaluation", secondary=evaluates_eval, back_populates="evaluates")
 Element.eval: Mapped[List["Evaluation"]] = relationship("Evaluation", secondary=evaluation_element, back_populates="ref")
+Element.evalu: Mapped[List["Evaluation"]] = relationship("Evaluation", secondary=evaluates_eval, back_populates="evaluates")
 Element.measure: Mapped[List["Measure"]] = relationship("Measure", back_populates="measurand", foreign_keys=[Measure.measurand_id])
 Element.project: Mapped["Project"] = relationship("Project", back_populates="involves", foreign_keys=[Element.project_id])
+
+#--- Relationships of the dataset table
+Dataset.observation_2: Mapped[List["Observation"]] = relationship("Observation", back_populates="dataset", foreign_keys=[Observation.dataset_id])
+Dataset.models: Mapped[List["Model"]] = relationship("Model", back_populates="dataset", foreign_keys=[Model.dataset_id])
+Dataset.datashape: Mapped["Datashape"] = relationship("Datashape", back_populates="dataset_1", foreign_keys=[Dataset.datashape_id])
 
 #--- Relationships of the model table
 Model.dataset: Mapped["Dataset"] = relationship("Dataset", back_populates="models", foreign_keys=[Model.dataset_id])
@@ -278,18 +286,10 @@ Model.dataset: Mapped["Dataset"] = relationship("Dataset", back_populates="model
 Feature.features: Mapped["Datashape"] = relationship("Datashape", back_populates="f_features", foreign_keys=[Feature.features_id])
 Feature.date: Mapped["Datashape"] = relationship("Datashape", back_populates="f_date", foreign_keys=[Feature.date_id])
 
-#--- Relationships of the dataset table
-Dataset.observation_2: Mapped[List["Observation"]] = relationship("Observation", back_populates="dataset", foreign_keys=[Observation.dataset_id])
-Dataset.datashape: Mapped["Datashape"] = relationship("Datashape", back_populates="dataset_1", foreign_keys=[Dataset.datashape_id])
-Dataset.models: Mapped[List["Model"]] = relationship("Model", back_populates="dataset", foreign_keys=[Model.dataset_id])
-
-#--- Relationships of the confparam table
-ConfParam.conf: Mapped["Configuration"] = relationship("Configuration", back_populates="params", foreign_keys=[ConfParam.conf_id])
-
 #--- Relationships of the metric table
-Metric.derivedBy: Mapped[List["Derived"]] = relationship("Derived", secondary=derived_metric, back_populates="baseMetric")
 Metric.measures: Mapped[List["Measure"]] = relationship("Measure", back_populates="metric", foreign_keys=[Measure.metric_id])
 Metric.category: Mapped[List["MetricCategory"]] = relationship("MetricCategory", secondary=metriccategory_metric, back_populates="metrics")
+Metric.derivedBy: Mapped[List["Derived"]] = relationship("Derived", secondary=derived_metric, back_populates="baseMetric")
 
 #--- Relationships of the derived table
 Derived.baseMetric: Mapped[List["Metric"]] = relationship("Metric", secondary=derived_metric, back_populates="derivedBy")
