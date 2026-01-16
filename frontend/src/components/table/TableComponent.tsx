@@ -96,16 +96,25 @@ export const TableComponent: React.FC<Props> = ({
     if (!endpoint) return;
     const backendBase = "http://localhost:8000";
     
-    // Check if table has lookup columns - if so, request detailed data with joins
-    const hasLookupColumns = options?.columns?.some(
-      (col: any) => typeof col === 'object' && col.column_type === 'lookup'
-    );
+    // Build URL with filter parameters if provided
+    let url = endpoint.startsWith("/") 
+      ? backendBase + endpoint
+      : endpoint;
     
-    // Add detailed=true query param if there are lookup columns
-    const urlParams = hasLookupColumns ? '?detailed=true' : '';
-    const url = endpoint.startsWith("/") 
-      ? backendBase + endpoint + urlParams
-      : endpoint + urlParams;
+    // Add filter parameters from dataBinding.filters
+    const filters = dataBinding?.filters;
+    if (filters && typeof filters === 'object') {
+      const queryParams = new URLSearchParams();
+      Object.entries(filters).forEach(([key, value]) => {
+        if (value !== null && value !== undefined) {
+          queryParams.append(key, String(value));
+        }
+      });
+      const queryString = queryParams.toString();
+      if (queryString) {
+        url += (url.includes('?') ? '&' : '?') + queryString;
+      }
+    }
     
     try {
       const response = await axios.get(url);
