@@ -160,6 +160,16 @@
     },
     {
       "selectors": [
+        "#iiqz5e"
+      ],
+      "style": {
+        "--chart-color-palette": "default",
+        "minHeight": "400px",
+        "width": "100%"
+      }
+    },
+    {
+      "selectors": [
         "#iv0tsf"
       ],
       "style": {
