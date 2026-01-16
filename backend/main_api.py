@@ -5214,46 +5214,100 @@ async def get_eval_of_feature(feature_id: int, database: Session = Depends(get_d
 @app.get("/metric/", response_model=None, tags=["Metric"])
 def get_all_metric(detailed: bool = False, database: Session = Depends(get_db)) -> list:
     from sqlalchemy.orm import joinedload
+    from sqlalchemy import text
     
     # Use detailed=true to get entities with eagerly loaded relationships (for tables with lookup columns)
     if detailed:
-        # Eagerly load all relationships to avoid N+1 queries
-        query = database.query(Metric)
-        metric_list = query.all()
-        
-        # Serialize with relationships included
-        result = []
-        for metric_item in metric_list:
-            item_dict = metric_item.__dict__.copy()
-            item_dict.pop('_sa_instance_state', None)
+        # Query the base metric table directly to avoid polymorphic identity errors
+        # This bypasses the ORM's polymorphic handling which fails for invalid type_spec values
+        try:
+            metric_list = database.query(Metric).all()
             
-            # Add many-to-one relationships (foreign keys for lookup columns)
-            
-            # Add many-to-many and one-to-many relationship objects (full details)
-            metriccategory_list = database.query(MetricCategory).join(metriccategory_metric, MetricCategory.id == metriccategory_metric.c.category).filter(metriccategory_metric.c.metrics == metric_item.id).all()
-            item_dict['category'] = []
-            for metriccategory_obj in metriccategory_list:
-                metriccategory_dict = metriccategory_obj.__dict__.copy()
-                metriccategory_dict.pop('_sa_instance_state', None)
-                item_dict['category'].append(metriccategory_dict)
-            derived_list = database.query(Derived).join(derived_metric, Derived.id == derived_metric.c.derivedBy).filter(derived_metric.c.baseMetric == metric_item.id).all()
-            item_dict['derivedBy'] = []
-            for derived_obj in derived_list:
-                derived_dict = derived_obj.__dict__.copy()
-                derived_dict.pop('_sa_instance_state', None)
-                item_dict['derivedBy'].append(derived_dict)
-            measure_list = database.query(Measure).filter(Measure.metric_id == metric_item.id).all()
-            item_dict['measures'] = []
-            for measure_obj in measure_list:
-                measure_dict = measure_obj.__dict__.copy()
-                measure_dict.pop('_sa_instance_state', None)
-                item_dict['measures'].append(measure_dict)
-            
-            result.append(item_dict)
-        return result
+            # Serialize with relationships included
+            result = []
+            for metric_item in metric_list:
+                item_dict = metric_item.__dict__.copy()
+                item_dict.pop('_sa_instance_state', None)
+                
+                # Add many-to-one relationships (foreign keys for lookup columns)
+                
+                # Add many-to-many and one-to-many relationship objects (full details)
+                try:
+                    metriccategory_list = database.query(MetricCategory).join(metriccategory_metric, MetricCategory.id == metriccategory_metric.c.category).filter(metriccategory_metric.c.metrics == metric_item.id).all()
+                    item_dict['category'] = []
+                    for metriccategory_obj in metriccategory_list:
+                        metriccategory_dict = metriccategory_obj.__dict__.copy()
+                        metriccategory_dict.pop('_sa_instance_state', None)
+                        item_dict['category'].append(metriccategory_dict)
+                except Exception as e:
+                    logger.warning(f"Could not load category relationships: {str(e)}")
+                    item_dict['category'] = []
+                
+                try:
+                    derived_list = database.query(Derived).join(derived_metric, Derived.id == derived_metric.c.derivedBy).filter(derived_metric.c.baseMetric == metric_item.id).all()
+                    item_dict['derivedBy'] = []
+                    for derived_obj in derived_list:
+                        derived_dict = derived_obj.__dict__.copy()
+                        derived_dict.pop('_sa_instance_state', None)
+                        item_dict['derivedBy'].append(derived_dict)
+                except Exception as e:
+                    logger.warning(f"Could not load derivedBy relationships: {str(e)}")
+                    item_dict['derivedBy'] = []
+                
+                try:
+                    measure_list = database.query(Measure).filter(Measure.metric_id == metric_item.id).all()
+                    item_dict['measures'] = []
+                    for measure_obj in measure_list:
+                        measure_dict = measure_obj.__dict__.copy()
+                        measure_dict.pop('_sa_instance_state', None)
+                        item_dict['measures'].append(measure_dict)
+                except Exception as e:
+                    logger.warning(f"Could not load measures: {str(e)}")
+                    item_dict['measures'] = []
+                
+                result.append(item_dict)
+            return result
+        except AssertionError as e:
+            # Handle polymorphic identity errors by querying raw SQL
+            if "polymorphic_identity" in str(e):
+                logger.warning(f"Polymorphic identity error, falling back to raw SQL: {str(e)}")
+                # Query directly from the metric table to avoid ORM polymorphic mapping issues
+                raw_metrics = database.execute(text("SELECT id, description, name, type_spec FROM metric")).fetchall()
+                result = []
+                for row in raw_metrics:
+                    result.append({
+                        'id': row[0],
+                        'description': row[1],
+                        'name': row[2],
+                        'type_spec': row[3],
+                        'category': [],
+                        'derivedBy': [],
+                        'measures': []
+                    })
+                return result
+            else:
+                raise
     else:
         # Default: return flat entities (faster for charts/widgets without lookup columns)
-        return database.query(Metric).all()
+        # Use try-catch to handle polymorphic identity errors
+        try:
+            return database.query(Metric).all()
+        except AssertionError as e:
+            # Handle polymorphic identity errors by querying raw SQL
+            if "polymorphic_identity" in str(e):
+                logger.warning(f"Polymorphic identity error in flat query, falling back to raw SQL: {str(e)}")
+                raw_metrics = database.execute(text("SELECT id, description, name, type_spec FROM metric")).fetchall()
+                result = []
+                for row in raw_metrics:
+                    result.append({
+                        'id': row[0],
+                        'description': row[1],
+                        'name': row[2],
+                        'type_spec': row[3]
+                    })
+                return result
+            else:
+                raise
 
 
 @app.get("/metric/count/", response_model=None, tags=["Metric"])
