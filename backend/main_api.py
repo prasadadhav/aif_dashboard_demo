@@ -3215,7 +3215,6 @@ async def create_element(element_data: ElementCreate, database: Session = Depend
     db_element = Element(
         name=element_data.name,
         description=element_data.description,
-,
         project_id=element_data.project        )
 
     database.add(db_element)
@@ -3277,7 +3276,6 @@ async def bulk_create_element(items: list[ElementCreate], database: Session = De
             db_element = Element(
                 name=item_data.name,
                 description=item_data.description,
-,
                 project_id=item_data.project            )
             database.add(db_element)
             database.flush()  # Get ID without committing
