@@ -7259,6 +7259,120 @@ async def get_metrics_of_metriccategory(metriccategory_id: int, database: Sessio
 
 
 
+############################################
+#
+#   New API functions
+#
+############################################
+from fastapi import Query
+from sqlalchemy import func
+from typing import Optional, List
+
+@app.get("/chart/model-metric-values")
+def chart_model_metric_values(
+    database: Session = Depends(get_db),
+    metric_names: str = Query("B2 Total,C2 Total", description="Comma-separated metric names"),
+    metric_ids: Optional[str] = Query(None, description="Comma-separated metric IDs (overrides metric_names)"),
+    limit: int = Query(0, ge=0, description="Optional limit for debugging (0 = no limit)"),
+):
+    # ---- Parse inputs ----
+    def split_csv(s: str) -> List[str]:
+        return [x.strip() for x in s.split(",") if x.strip()]
+
+    names = split_csv(metric_names)
+
+    ids: List[int] = []
+    if metric_ids:
+        try:
+            ids = [int(x) for x in split_csv(metric_ids)]
+        except ValueError:
+            return {"error": "metric_ids must be comma-separated integers", "metric_ids": metric_ids}
+
+    # ---- Base query: Measure -> Model, Metric ----
+    q = (
+        database.query(
+            Model.pid.label("pid"),              # model name
+            Metric.name.label("metric"),         # metric name
+            Measure.value.label("value"),
+            Measure.metric_id.label("metric_id"),
+            Measure.measurand_id.label("measurand_id"),
+            Measure.id.label("measure_id"),
+        )
+        .select_from(Measure)
+        .join(Model, Model.id == Measure.measurand_id)
+        .join(Metric, Metric.id == Measure.metric_id)
+        .order_by(Model.pid, Metric.name, Measure.id)
+    )
+
+    # ---- Apply filter: prefer ids if provided ----
+    requested = {}
+    if ids:
+        q = q.filter(Measure.metric_id.in_(ids))
+        requested = {"metric_ids": ids}
+    else:
+        # Robust name matching: trim + lower on BOTH sides
+        # Handles "B2 Total", "B2 Total ", "b2 total", etc.
+        names_norm = [n.strip().lower() for n in names if n.strip()]
+        if not names_norm:
+            return {"error": "No metric_names provided", "metric_names": metric_names}
+
+        q = q.filter(func.lower(func.trim(Metric.name)).in_(names_norm))
+        requested = {"metric_names": names}
+
+    if limit and limit > 0:
+        q = q.limit(limit)
+
+    rows = q.all()
+
+    # ---- If no rows, return diagnostics (not empty []) ----
+    if not rows:
+        # What metrics do we actually have?
+        metric_list = (
+            database.query(Metric.id, Metric.name)
+            .order_by(Metric.id)
+            .all()
+        )
+        # Show some sample joined rows without filters (prove joins work)
+        sample = (
+            database.query(
+                Model.pid.label("pid"),
+                Metric.name.label("metric"),
+                Measure.value.label("value"),
+            )
+            .select_from(Measure)
+            .join(Model, Model.id == Measure.measurand_id)
+            .join(Metric, Metric.id == Measure.metric_id)
+            .order_by(Measure.id)
+            .limit(10)
+            .all()
+        )
+
+        return {
+            "requested": requested,
+            "matched_rows": 0,
+            "hint": "No rows matched. Likely metric_names mismatch (spacing/case) or you should use metric_ids.",
+            "available_metrics": [{"id": int(m.id), "name": m.name} for m in metric_list],
+            "sample_joined_rows": [{"pid": s.pid, "metric": s.metric, "value": float(s.value) if s.value is not None else None} for s in sample],
+        }
+
+    # ---- Normal successful return ----
+    return [
+        {
+            "pid": r.pid,
+            "metric": r.metric,
+            "value": float(r.value) if r.value is not None else None,
+            "metric_id": int(r.metric_id),
+            "measurand_id": int(r.measurand_id),
+            "measure_id": int(r.measure_id),
+        }
+        for r in rows
+    ]
+
+
+
+
+
+
 
 
 
