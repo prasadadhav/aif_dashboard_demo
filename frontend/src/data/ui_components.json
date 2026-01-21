@@ -94,7 +94,7 @@
                             "curve-type": "monotone",
                             "id": "ikj6y7",
                             "line-width": "2",
-                            "series": "[{\"name\":\"Series 1\",\"color\":\"#4CAF50\",\"data\":[{\"name\":\"Category A\",\"value\":40},{\"name\":\"Category B\",\"value\":65},{\"name\":\"Category C\",\"value\":85},{\"name\":\"Category D\",\"value\":55},{\"name\":\"Category E\",\"value\":75}],\"dataSource\":\"a2546a91-1913-4cac-86ac-283c39218a3a\",\"labelField\":\"\",\"dataField\":\"\",\"data-source\":\"d6a622b9-2432-4411-a3f2-5815dff2085e\",\"label-field\":\"a2546a91-1913-4cac-86ac-283c39218a3a\",\"data-field\":\"674a9474-89c9-4fd5-bb24-1313a5c1bab8\"},{\"name\":\"Series 2\",\"color\":\"#FFBB28\",\"data\":[{\"name\":\"Category A\",\"value\":53},{\"name\":\"Category B\",\"value\":65},{\"name\":\"Category C\",\"value\":42},{\"name\":\"Category D\",\"value\":52},{\"name\":\"Category E\",\"value\":80}],\"dataSource\":\"\",\"labelField\":\"\",\"dataField\":\"\"}]",
+                            "series": "[{\"name\":\"Series 1\",\"color\":\"#f51313\",\"data\":[{\"name\":\"Category A\",\"value\":40},{\"name\":\"Category B\",\"value\":65},{\"name\":\"Category C\",\"value\":85},{\"name\":\"Category D\",\"value\":55},{\"name\":\"Category E\",\"value\":75}],\"dataSource\":\"d6a622b9-2432-4411-a3f2-5815dff2085e\",\"labelField\":\"674a9474-89c9-4fd5-bb24-1313a5c1bab8\",\"dataField\":\"a2546a91-1913-4cac-86ac-283c39218a3a\",\"data-source\":\"d6a622b9-2432-4411-a3f2-5815dff2085e\",\"label-field\":\"674a9474-89c9-4fd5-bb24-1313a5c1bab8\",\"data-field\":\"a2546a91-1913-4cac-86ac-283c39218a3a\",\"filter\":\"evaluation.observation[0].measure.find(m => m.metric.name === 'B2 Total')?.value\"},{\"name\":\"Series 2\",\"color\":\"#7e29ff\",\"data\":[{\"name\":\"Category A\",\"value\":53},{\"name\":\"Category B\",\"value\":65},{\"name\":\"Category C\",\"value\":42},{\"name\":\"Category D\",\"value\":52},{\"name\":\"Category E\",\"value\":80}],\"dataSource\":\"\",\"labelField\":\"\",\"dataField\":\"\",\"data-source\":\"d6a622b9-2432-4411-a3f2-5815dff2085e\",\"label-field\":\"674a9474-89c9-4fd5-bb24-1313a5c1bab8\",\"data-field\":\"a2546a91-1913-4cac-86ac-283c39218a3a\",\"filter\":\"evaluation.observation[0].measure.find(m => m.metric.name === 'C2 Total')?.value\"}]",
                             "show-grid": "true",
                             "show-legend": "true",
                             "show-tooltip": "true"
@@ -142,7 +142,7 @@
                             "chart-title": "Bar Chart",
                             "id": "icsdfx",
                             "orientation": "vertical",
-                            "series": "[{\"name\":\"Series 1\",\"color\":\"#3498db\",\"data\":[{\"name\":\"Category A\",\"value\":40},{\"name\":\"Category B\",\"value\":65},{\"name\":\"Category C\",\"value\":85},{\"name\":\"Category D\",\"value\":55},{\"name\":\"Category E\",\"value\":75}],\"data-source\":\"d6a622b9-2432-4411-a3f2-5815dff2085e\",\"label-field\":\"674a9474-89c9-4fd5-bb24-1313a5c1bab8\",\"data-field\":\"a2546a91-1913-4cac-86ac-283c39218a3a\"}]",
+                            "series": "[{\"name\":\"Series 1\",\"color\":\"#3498db\",\"data\":[{\"name\":\"Category A\",\"value\":40},{\"name\":\"Category B\",\"value\":65},{\"name\":\"Category C\",\"value\":85},{\"name\":\"Category D\",\"value\":55},{\"name\":\"Category E\",\"value\":75}],\"dataSource\":\"d6a622b9-2432-4411-a3f2-5815dff2085e\",\"labelField\":\"674a9474-89c9-4fd5-bb24-1313a5c1bab8\",\"dataField\":\"a2546a91-1913-4cac-86ac-283c39218a3a\",\"data-source\":\"d6a622b9-2432-4411-a3f2-5815dff2085e\",\"label-field\":\"674a9474-89c9-4fd5-bb24-1313a5c1bab8\",\"data-field\":\"a2546a91-1913-4cac-86ac-283c39218a3a\"}]",
                             "show-grid": "true",
                             "show-legend": "true",
                             "stacked": "false"
@@ -189,7 +189,7 @@
                             "chart-color": "#8884d8",
                             "chart-title": "Radar Chart",
                             "id": "iy2apa",
-                            "series": "[{\"name\":\"Series 1\",\"color\":\"#8884d8\",\"data\":[{\"subject\":\"Category A\",\"value\":85,\"fullMark\":100},{\"subject\":\"Category B\",\"value\":75,\"fullMark\":100},{\"subject\":\"Category C\",\"value\":90,\"fullMark\":100},{\"subject\":\"Category D\",\"value\":80,\"fullMark\":100},{\"subject\":\"Category E\",\"value\":70,\"fullMark\":100}],\"data-source\":\"d6a622b9-2432-4411-a3f2-5815dff2085e\",\"label-field\":\"674a9474-89c9-4fd5-bb24-1313a5c1bab8\",\"data-field\":\"a2546a91-1913-4cac-86ac-283c39218a3a\"}]",
+                            "series": "[{\"name\":\"Series 1\",\"color\":\"#8884d8\",\"data\":[{\"subject\":\"Category A\",\"value\":85,\"fullMark\":100},{\"subject\":\"Category B\",\"value\":75,\"fullMark\":100},{\"subject\":\"Category C\",\"value\":90,\"fullMark\":100},{\"subject\":\"Category D\",\"value\":80,\"fullMark\":100},{\"subject\":\"Category E\",\"value\":70,\"fullMark\":100}],\"dataSource\":\"d6a622b9-2432-4411-a3f2-5815dff2085e\",\"labelField\":\"674a9474-89c9-4fd5-bb24-1313a5c1bab8\",\"dataField\":\"a2546a91-1913-4cac-86ac-283c39218a3a\",\"data-source\":\"d6a622b9-2432-4411-a3f2-5815dff2085e\",\"label-field\":\"674a9474-89c9-4fd5-bb24-1313a5c1bab8\",\"data-field\":\"a2546a91-1913-4cac-86ac-283c39218a3a\"}]",
                             "show-grid": "true",
                             "show-radius-axis": "true",
                             "show-tooltip": "true"
@@ -287,8 +287,8 @@
                           "children": [
                             {
                               "attributes": {
-                                "data-field": "ee1a94d3-27c9-4669-9134-a2cae7488053",
-                                "data-source": "16a4766d-cdc1-4e69-b582-014ad2bada56",
+                                "data-field": "d9450a4f-5890-4e67-badc-d6299cea2351",
+                                "data-source": "b910ce24-f2bd-40de-b141-ce2956087223",
                                 "format": "number",
                                 "id": "iy7zsy",
                                 "metric-title": "Model Familys tested",
@@ -304,9 +304,9 @@
                               ],
                               "color": "#2c3e50",
                               "data_binding": {
-                                "data_field": "pid",
-                                "endpoint": "/model/",
-                                "entity": "Model"
+                                "data_field": "source",
+                                "endpoint": "/dataset/",
+                                "entity": "Dataset"
                               },
                               "display_order": 0,
                               "id": "iy7zsy",
@@ -327,11 +327,11 @@
                             },
                             {
                               "attributes": {
-                                "data-field": "0412dc4e-49a5-4d3f-96e0-d36a3d9ee1b0",
-                                "data-source": "e4422346-28c3-44e5-b12b-b0eafe8f9796",
+                                "data-field": "16a4766d-cdc1-4e69-b582-014ad2bada56",
+                                "data-source": "b910ce24-f2bd-40de-b141-ce2956087223",
                                 "format": "number",
                                 "id": "ip3i4k",
-                                "metric-title": "Models evaluated",
+                                "metric-title": "Total Models evaluated",
                                 "negative-color": "#e74c3c",
                                 "positive-color": "#27ae60",
                                 "show-trend": true,
@@ -344,15 +344,14 @@
                               ],
                               "color": "#2c3e50",
                               "data_binding": {
-                                "data_field": "name",
-                                "endpoint": "/tool/",
-                                "entity": "Tool"
+                                "endpoint": "/dataset/",
+                                "entity": "Dataset"
                               },
                               "display_order": 1,
                               "id": "ip3i4k",
                               "metric": {
                                 "format": "number",
-                                "metricTitle": "Models evaluated",
+                                "metricTitle": "Total Models evaluated",
                                 "negativeColor": "#e74c3c",
                                 "positiveColor": "#27ae60",
                                 "showTrend": true,
@@ -362,7 +361,7 @@
                                 "valueSize": 32
                               },
                               "name": "ip3i4k",
-                              "title": "Models evaluated",
+                              "title": "Total Models evaluated",
                               "type": "metric-card"
                             },
                             {
@@ -371,7 +370,7 @@
                                 "data-source": "a2546a91-1913-4cac-86ac-283c39218a3a",
                                 "format": "number",
                                 "id": "ilcwkv",
-                                "metric-title": "No. of Metriccs",
+                                "metric-title": "No. of Metrics",
                                 "negative-color": "#e74c3c",
                                 "positive-color": "#27ae60",
                                 "show-trend": true,
@@ -391,7 +390,7 @@
                               "id": "ilcwkv",
                               "metric": {
                                 "format": "number",
-                                "metricTitle": "No. of Metriccs",
+                                "metricTitle": "No. of Metrics",
                                 "negativeColor": "#e74c3c",
                                 "positiveColor": "#27ae60",
                                 "showTrend": true,
@@ -401,7 +400,7 @@
                                 "valueSize": 32
                               },
                               "name": "ilcwkv",
-                              "title": "No. of Metriccs",
+                              "title": "No. of Metrics",
                               "type": "metric-card"
                             }
                           ],

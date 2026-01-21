@@ -9,114 +9,102 @@ from abc import ABC, abstractmethod
 # Enumerations are defined here
 ############################################
 
-class LicensingType(Enum):
-    Open_Source = "Open_Source"
-    Proprietary = "Proprietary"
+class EvaluationStatus(Enum):
+    Processing = "Processing"
+    Done = "Done"
+    Custom = "Custom"
+    Archived = "Archived"
+    Pending = "Pending"
 
 class DatasetType(Enum):
     Training = "Training"
-    Validation = "Validation"
     Test = "Test"
+    Validation = "Validation"
 
-class EvaluationStatus(Enum):
-    Custom = "Custom"
-    Processing = "Processing"
-    Pending = "Pending"
-    Archived = "Archived"
-    Done = "Done"
+class LicensingType(Enum):
+    Proprietary = "Proprietary"
+    Open_Source = "Open_Source"
 
 class ProjectStatus(Enum):
-    Archived = "Archived"
+    Closed = "Closed"
+    Created = "Created"
     Ready = "Ready"
     Pending = "Pending"
-    Created = "Created"
-    Closed = "Closed"
+    Archived = "Archived"
 
 ############################################
 # Classes are defined here
 ############################################
-class MeasureCreate(BaseModel):
-    error: str
-    uncertainty: float
-    value: float
-    unit: str
-    metric: int  # N:1 Relationship (mandatory)
-    measurand: int  # N:1 Relationship (mandatory)
-    observation: int  # N:1 Relationship (mandatory)
-
-class AssessmentElementCreate(ABC, BaseModel):
-    name: str
-    description: str
-
-class ElementCreate(AssessmentElementCreate):
-    measure: Optional[List[int]] = None  # 1:N Relationship
-    eval: List[int]  # N:M Relationship
-    project: Optional[int] = None  # N:1 Relationship (optional)
-    evalu: List[int]  # N:M Relationship
-
-class MetricCreate(AssessmentElementCreate):
-    measures: Optional[List[int]] = None  # 1:N Relationship
-    derivedBy: List[int]  # N:M Relationship
-    category: List[int]  # N:M Relationship
-
-class MetricCategoryCreate(AssessmentElementCreate):
-    metrics: List[int]  # N:M Relationship
-
 class CommentsCreate(BaseModel):
     Name: str
-    Comments: str
     TimeStamp: datetime
+    Comments: str
 
 class LegalRequirementCreate(BaseModel):
+    standard: str
     principle: str
     legal_ref: str
-    standard: str
     project_1: int  # N:1 Relationship (mandatory)
 
 class ToolCreate(BaseModel):
     source: str
     version: str
-    name: str
     licensing: LicensingType
+    name: str
     observation_1: Optional[List[int]] = None  # 1:N Relationship
+
+class DatashapeCreate(BaseModel):
+    accepted_target_values: str
+    f_date: Optional[List[int]] = None  # 1:N Relationship
+    dataset_1: Optional[List[int]] = None  # 1:N Relationship
+    f_features: Optional[List[int]] = None  # 1:N Relationship
+
+class ProjectCreate(BaseModel):
+    status: ProjectStatus
+    name: str
+    involves: Optional[List[int]] = None  # 1:N Relationship
+    eval: Optional[List[int]] = None  # 1:N Relationship
+    legal_requirements: Optional[List[int]] = None  # 1:N Relationship
+
+class EvaluationCreate(BaseModel):
+    status: EvaluationStatus
+    config: int  # N:1 Relationship (mandatory)
+    evaluates: List[int]  # N:M Relationship
+    observations: Optional[List[int]] = None  # 1:N Relationship
+    ref: List[int]  # N:M Relationship
+    project: int  # N:1 Relationship (mandatory)
+
+class MeasureCreate(BaseModel):
+    value: float
+    unit: str
+    error: str
+    uncertainty: float
+    observation: int  # N:1 Relationship (mandatory)
+    metric: int  # N:1 Relationship (mandatory)
+    measurand: int  # N:1 Relationship (mandatory)
+
+class AssessmentElementCreate(ABC, BaseModel):
+    description: str
+    name: str
+
+class ObservationCreate(AssessmentElementCreate):
+    whenObserved: datetime
+    observer: str
+    eval: int  # N:1 Relationship (mandatory)
+    tool: int  # N:1 Relationship (mandatory)
+    measures: Optional[List[int]] = None  # 1:N Relationship
+    dataset: int  # N:1 Relationship (mandatory)
 
 class ConfParamCreate(AssessmentElementCreate):
     param_type: str
     value: str
     conf: int  # N:1 Relationship (mandatory)
 
-class ConfigurationCreate(AssessmentElementCreate):
-    eval: Optional[List[int]] = None  # 1:N Relationship
-    params: Optional[List[int]] = None  # 1:N Relationship
-
-class FeatureCreate(ElementCreate):
-    min_value: float
-    feature_type: str
-    max_value: float
-    features: int  # N:1 Relationship (mandatory)
-    date: int  # N:1 Relationship (mandatory)
-
-class DatashapeCreate(BaseModel):
-    accepted_target_values: str
-    dataset_1: Optional[List[int]] = None  # 1:N Relationship
-    f_features: Optional[List[int]] = None  # 1:N Relationship
-    f_date: Optional[List[int]] = None  # 1:N Relationship
-
-class DatasetCreate(ElementCreate):
-    dataset_type: DatasetType
-    version: str
-    licensing: LicensingType
-    source: str
-    datashape: int  # N:1 Relationship (mandatory)
-    models: Optional[List[int]] = None  # 1:N Relationship
-    observation_2: Optional[List[int]] = None  # 1:N Relationship
-
-class ProjectCreate(BaseModel):
-    status: ProjectStatus
-    name: str
-    eval: Optional[List[int]] = None  # 1:N Relationship
-    legal_requirements: Optional[List[int]] = None  # 1:N Relationship
-    involves: Optional[List[int]] = None  # 1:N Relationship
+class ElementCreate(AssessmentElementCreate):
+    eval: List[int]  # N:M Relationship
+    project: Optional[int] = None  # N:1 Relationship (optional)
+    measure: Optional[List[int]] = None  # 1:N Relationship
+    evalu: List[int]  # N:M Relationship
 
 class ModelCreate(ElementCreate):
     pid: str
@@ -125,26 +113,38 @@ class ModelCreate(ElementCreate):
     data: str
     dataset: int  # N:1 Relationship (mandatory)
 
-class DerivedCreate(MetricCreate):
-    expression: str
-    baseMetric: List[int]  # N:M Relationship
+class FeatureCreate(ElementCreate):
+    min_value: float
+    max_value: float
+    feature_type: str
+    date: int  # N:1 Relationship (mandatory)
+    features: int  # N:1 Relationship (mandatory)
+
+class DatasetCreate(ElementCreate):
+    version: str
+    source: str
+    dataset_type: DatasetType
+    licensing: LicensingType
+    models: Optional[List[int]] = None  # 1:N Relationship
+    observation_2: Optional[List[int]] = None  # 1:N Relationship
+    datashape: int  # N:1 Relationship (mandatory)
+
+class ConfigurationCreate(AssessmentElementCreate):
+    params: Optional[List[int]] = None  # 1:N Relationship
+    eval: Optional[List[int]] = None  # 1:N Relationship
+
+class MetricCreate(AssessmentElementCreate):
+    measures: Optional[List[int]] = None  # 1:N Relationship
+    derivedBy: List[int]  # N:M Relationship
+    category: List[int]  # N:M Relationship
 
 class DirectCreate(MetricCreate):
     pass
 
-class EvaluationCreate(BaseModel):
-    status: EvaluationStatus
-    project: int  # N:1 Relationship (mandatory)
-    observations: Optional[List[int]] = None  # 1:N Relationship
-    ref: List[int]  # N:M Relationship
-    evaluates: List[int]  # N:M Relationship
-    config: int  # N:1 Relationship (mandatory)
+class DerivedCreate(MetricCreate):
+    expression: str
+    baseMetric: List[int]  # N:M Relationship
 
-class ObservationCreate(AssessmentElementCreate):
-    observer: str
-    whenObserved: datetime
-    tool: int  # N:1 Relationship (mandatory)
-    eval: int  # N:1 Relationship (mandatory)
-    measures: Optional[List[int]] = None  # 1:N Relationship
-    dataset: int  # N:1 Relationship (mandatory)
+class MetricCategoryCreate(AssessmentElementCreate):
+    metrics: List[int]  # N:M Relationship
 
