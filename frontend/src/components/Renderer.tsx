@@ -502,7 +502,7 @@ export const Renderer: React.FC<RendererProps> = ({ component, styles }) => {
         data={chartData}
         labelField={actualLabelField}
         dataField={actualDataField}
-        options={component.chart || {}}
+        options={{ ...(component.chart ?? {}), ...(component.attributes ?? {}) }}
         styles={style}
       />
     );
@@ -552,7 +552,7 @@ export const Renderer: React.FC<RendererProps> = ({ component, styles }) => {
         data={chartData}
         labelField={actualLabelField}
         dataField={actualDataField}
-        options={component.chart || {}}
+        options={{ ...(component.chart ?? {}), ...(component.attributes ?? {}) }}
         styles={style}
       />
     );
