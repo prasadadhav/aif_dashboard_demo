@@ -93,6 +93,32 @@ export const Renderer: React.FC<RendererProps> = ({ component, styles }) => {
     }
   }, [component.type, component.data_binding?.endpoint]);
 
+  // PSA: Making sure we are picking up the correct data binding
+  useEffect(() => {
+  if (component.type === "line-chart") {
+    const endpoint = component.data_binding?.endpoint;
+    if (endpoint) {
+      setLoading(true);
+      setError(null);
+      const backendBase = "http://localhost:8000";
+      axios
+        .get(`${backendBase}${endpoint}`)
+        .then((res) => {
+          let data: any[] = res.data;
+          console.log("Fetched chart data:", data);  // Debugging line
+          setChartData(data);
+        })
+        .catch((err) => {
+          setError("Error loading data");
+          setChartData([]);
+        })
+        .finally(() => setLoading(false));
+    }
+  }
+}, [component]);
+
+
+
   // Data list fetching effect
   useEffect(() => {
     if (component.type === "data-list" && component.data_sources && component.data_sources.length > 0) {
@@ -497,7 +523,7 @@ export const Renderer: React.FC<RendererProps> = ({ component, styles }) => {
     if (error) return <div id={component.id}>{error}</div>;
     
     // Use configured field names from data_binding, with intelligent fallback
-    let actualLabelField = component.data_binding?.label_field || "name";
+    let actualLabelField = component.data_binding?.label_field || "pid";
     let actualDataField = component.data_binding?.data_field || "value";
     
     // If data_binding fields look like UUIDs (contain hyphens and are long), detect from data
@@ -508,7 +534,7 @@ export const Renderer: React.FC<RendererProps> = ({ component, styles }) => {
       const keys = Object.keys(firstItem);
       
       if (isUUID(actualLabelField)) {
-        actualLabelField = keys.find(k => ['name', 'label', 'attribute'].includes(k.toLowerCase())) || 
+        actualLabelField = keys.find(k => ['pid','name', 'label', 'attribute'].includes(k.toLowerCase())) || 
                           keys.find(k => typeof firstItem[k] === 'string') || 
                           'name';
       }

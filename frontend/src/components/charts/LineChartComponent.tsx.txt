@@ -58,9 +58,6 @@ export const LineChartComponent: React.FC<Props> = ({
   const showTooltip = options?.showTooltip ?? true;
   const legendPosition = options?.legendPosition || "top";
 
-  // Extract all metric columns (excluding the pid column)
-  const metricKeys = data && data.length > 0 ? Object.keys(data[0]).filter((key) => key !== labelField) : [];
-
   return (
     <div id={id} style={containerStyle}>
       {title && <h3 style={{ textAlign: "center", marginBottom: "10px" }}>{title}</h3>}
@@ -71,19 +68,14 @@ export const LineChartComponent: React.FC<Props> = ({
           <YAxis />
           {showTooltip && <Tooltip />}
           {showLegend && <Legend verticalAlign={legendPosition} />}
-
-          {metricKeys.map((metricKey) => (
-            <Line
-              key={metricKey}
-              type={options?.curveType || "monotone"}
-              dataKey={metricKey}
-              name={metricKey}
-              stroke={resolvedColor}
-              strokeWidth={strokeWidth}
-              dot={options?.dotSize ? { r: options.dotSize } : true}
-              isAnimationActive={options?.animate ?? true}
-            />
-          ))}
+          <Line
+            type={options?.curveType || "monotone"}
+            dataKey={dataField}
+            stroke={resolvedColor}
+            strokeWidth={strokeWidth}
+            dot={options?.dotSize ? { r: options.dotSize } : true}
+            isAnimationActive={options?.animate ?? true}
+          />
         </LineChart>
       </ResponsiveContainer>
     </div>

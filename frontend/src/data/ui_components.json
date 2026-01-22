@@ -91,13 +91,19 @@
                             "animate": "true",
                             "chart-color": "#4CAF50",
                             "chart-title": "Line Chart",
-                            "curve-type": "monotone",
+                            "curve-type": "linear",
                             "id": "ikj6y7",
                             "line-width": "2",
-                            "series": "[{\"name\":\"Series 1\",\"color\":\"#f51313\",\"data\":[{\"name\":\"Category A\",\"value\":40},{\"name\":\"Category B\",\"value\":65},{\"name\":\"Category C\",\"value\":85},{\"name\":\"Category D\",\"value\":55},{\"name\":\"Category E\",\"value\":75}],\"dataSource\":\"d6a622b9-2432-4411-a3f2-5815dff2085e\",\"labelField\":\"674a9474-89c9-4fd5-bb24-1313a5c1bab8\",\"dataField\":\"a2546a91-1913-4cac-86ac-283c39218a3a\",\"data-source\":\"d6a622b9-2432-4411-a3f2-5815dff2085e\",\"label-field\":\"674a9474-89c9-4fd5-bb24-1313a5c1bab8\",\"data-field\":\"a2546a91-1913-4cac-86ac-283c39218a3a\"},{\"name\":\"Series 2\",\"color\":\"#7e29ff\",\"data\":[{\"name\":\"Category A\",\"value\":53},{\"name\":\"Category B\",\"value\":65},{\"name\":\"Category C\",\"value\":42},{\"name\":\"Category D\",\"value\":52},{\"name\":\"Category E\",\"value\":80}],\"dataSource\":\"\",\"labelField\":\"\",\"dataField\":\"\",\"data-source\":\"d6a622b9-2432-4411-a3f2-5815dff2085e\",\"label-field\":\"674a9474-89c9-4fd5-bb24-1313a5c1bab8\",\"data-field\":\"a2546a91-1913-4cac-86ac-283c39218a3a\"}]",
+                            "label-field": "pid",
+                            "data-field": "value",
+                            "series": "[{\"name\":\"A1 Grammar\",\"color\":\"#000000\"}, {\"name\":\"A2 Total\",\"color\":\"#0088FE\"}]",
                             "show-grid": "true",
                             "show-legend": "true",
                             "show-tooltip": "true"
+                          },
+                          "data_binding": {
+                            "endpoint": "/chart/model-metric-values?metric_ids=1,10",
+                            "entity": "Measure"
                           },
                           "chart": {
                             "animate": true,
