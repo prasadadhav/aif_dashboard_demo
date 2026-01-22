@@ -200,15 +200,16 @@
                           "attributes": {
                             "chart-color": "#8884d8",
                             "chart-title": "Radar Chart",
-                            "id": "iy2apa","label-field": "pid",
+                            "id": "iy2apa",
+                            "label-field": "name",
                             "data-field": "value",
-                            "series": "[{\"name\":\"A1 Total\",\"color\":\"#FF6B6B\"}, {\"name\":\"A2 Total\",\"color\":\"#0088FE\"}]",
+                            "series": "[{\"name\":\"A1 Total\",\"color\":\"#FF6B6B\"}, {\"name\":\"A2 Total\",\"color\":\"#0088FE\"}, {\"name\":\"B1 Total\",\"color\":\"#FF6B6B\"}, {\"name\":\"B2 Total\",\"color\":\"#0088FE\"}, {\"name\":\"C1 Total\",\"color\":\"#FF6B6B\"}, {\"name\":\"C2 Total\",\"color\":\"#0088FE\"}]",
                             "show-grid": "true",
                             "show-radius-axis": "true",
                             "show-tooltip": "true"
                           },
                           "data_binding": {
-                            "endpoint": "/chart/model-metric-values?metric_ids=5,10",
+                            "endpoint": "/chart/model-metric-values?metric_ids=5,10,15,20,25,30",
                             "entity": "Measure"
                           },
                           "chart": {

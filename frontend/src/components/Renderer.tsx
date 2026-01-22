@@ -431,7 +431,7 @@ export const Renderer: React.FC<RendererProps> = ({ component, styles }) => {
     if (error) return <div id={component.id}>{error}</div>;
     
     // Use configured field names from data_binding, with intelligent fallback
-    let actualLabelField = component.data_binding?.label_field || "name";
+    let actualLabelField = component.data_binding?.label_field || "pid";
     let actualDataField = component.data_binding?.data_field || "value";
     
     // If data_binding fields look like UUIDs (contain hyphens and are long), detect from data
