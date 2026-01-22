@@ -96,10 +96,11 @@
                             "line-width": "2",
                             "label-field": "pid",
                             "data-field": "value",
-                            "series": "[{\"name\":\"A1 Grammar\",\"color\":\"#000000\"}, {\"name\":\"A2 Total\",\"color\":\"#0088FE\"}]",
+                            "series": "[{\"name\":\"A1 Grammar\",\"color\":\"#FF6B6B\"}, {\"name\":\"A2 Total\",\"color\":\"#0088FE\"}]",
                             "show-grid": "true",
                             "show-legend": "true",
-                            "show-tooltip": "true"
+                            "show-tooltip": "true",
+                            "xAxisLabelAngle": -90
                           },
                           "data_binding": {
                             "endpoint": "/chart/model-metric-values?metric_ids=1,10",
@@ -114,12 +115,13 @@
                             "lineWidth": 2,
                             "showGrid": true,
                             "showLegend": true,
-                            "showTooltip": true
+                            "showTooltip": true,
+                            "xAxisLabelAngle": -90
                           },
                           "class_list": [
                             "line-chart-component"
                           ],
-                          "color": "#4CAF50",
+                          "color": "#FF6B6B",
                           "display_order": 0,
                           "id": "ikj6y7",
                           "name": "Line Chart",
