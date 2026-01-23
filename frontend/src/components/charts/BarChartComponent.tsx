@@ -21,6 +21,22 @@ interface Props {
   styles?: CSSProperties;
 }
 
+// Helper to get nested values using dot notation (e.g., "measures.value")
+const getNestedValue = (obj: any, path: string): any => {
+  if (!obj || !path) return undefined;
+  const parts = path.split('.');
+  let current = obj;
+  for (const part of parts) {
+    if (current === null || current === undefined) return undefined;
+    if (Array.isArray(current)) {
+      current = current[0];
+      if (current === undefined) return undefined;
+    }
+    current = current[part];
+  }
+  return current;
+};
+
 const resolveColor = (
   explicit?: string,
   options?: Record<string, any>,
@@ -41,6 +57,22 @@ export const BarChartComponent: React.FC<Props> = ({
   options,
   styles,
 }) => {
+  // Transform data if using nested fields (dot notation)
+  const isNestedField = (field: string) => field?.includes('.') || false;
+  const chartData = React.useMemo(() => {
+    if (!isNestedField(labelField) && !isNestedField(dataField)) {
+      return data; // No transformation needed
+    }
+    return data.map((item: any) => ({
+      name: isNestedField(labelField) ? getNestedValue(item, labelField) : item[labelField],
+      value: isNestedField(dataField) ? getNestedValue(item, dataField) : item[dataField],
+    }));
+  }, [data, labelField, dataField]);
+
+  // Use transformed field names if we did transformation
+  const actualLabelField = (isNestedField(labelField) || isNestedField(dataField)) ? 'name' : labelField;
+  const actualDataField = (isNestedField(labelField) || isNestedField(dataField)) ? 'value' : dataField;
+
   const containerStyle: CSSProperties = {
     width: "100%",
     height: "400px",
@@ -54,52 +86,37 @@ export const BarChartComponent: React.FC<Props> = ({
   const showTooltip = options?.showTooltip ?? true;
   const legendPosition = options?.legendPosition || "top";
   const resolvedColor = resolveColor(color, options, styles);
-  const xAxisLabelAngle = options?.xAxisLabelAngle ?? 0;
-
-  // Extract all metric columns (excluding the labelField column)
-  const metricKeys = data && data.length > 0 ? Object.keys(data[0]).filter((key) => key !== labelField) : [];
-
-  // Parse series configuration for colors
-  const colorMap: { [key: string]: string } = {};
-  if (options?.series) {
-    try {
-      const parsedSeries = JSON.parse(options.series);
-      parsedSeries.forEach((s: any) => {
-        if (s.name && s.color) {
-          colorMap[s.name] = s.color;
-        }
-      });
-    } catch (e) {
-      console.error('Failed to parse series config:', e);
-    }
-  }
 
   return (
     <div id={id} style={containerStyle}>
       {title && <h3 style={{ textAlign: "center", marginBottom: "10px" }}>{title}</h3>}
       <ResponsiveContainer width="100%" height={360}>
-        <BarChart data={data} margin={{ top: 5, right: 30, left: 20, bottom: xAxisLabelAngle ? 100 : 5}} >
-          {showGrid && <CartesianGrid strokeDasharray="3 3" stroke={options?.gridColor} />}
-          <XAxis 
-                      // dataKey={labelField}
-                      // angle={xAxisLabelAngle}
-                      // textAnchor={xAxisLabelAngle ? "end" : "middle"}
-                      // height={xAxisLabelAngle ? 100 : undefined}
-                      // tick={{ fontSize: 8 }}
-                    />
-          <YAxis />
+        <BarChart
+          data={chartData}
+          margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
+          layout={orientation === "horizontal" ? "vertical" : "horizontal"}
+          barSize={options?.barWidth}
+          barCategoryGap={options?.barGap}
+        >
+          {showGrid && (
+            <CartesianGrid strokeDasharray="3 3" stroke={options?.gridColor} />
+          )}
+          <XAxis
+            type={orientation === "horizontal" ? "number" : "category"}
+            dataKey={orientation === "horizontal" ? actualDataField : actualLabelField}
+          />
+          <YAxis
+            type={orientation === "horizontal" ? "category" : "number"}
+            dataKey={orientation === "horizontal" ? actualLabelField : undefined}
+          />
           {showTooltip && <Tooltip />}
           {showLegend && <Legend verticalAlign={legendPosition} />}
-
-          {metricKeys.map((metricKey) => (
-            <Bar
-              key={metricKey}
-              dataKey={metricKey}
-              name={metricKey}
-              fill={colorMap[metricKey] || resolveColor(color, options, styles)}
-              isAnimationActive={options?.animate ?? true}
-            />
-          ))}
+          <Bar
+            dataKey={actualDataField}
+            fill={resolvedColor}
+            stackId={options?.stacked ? "stack" : undefined}
+            isAnimationActive={options?.animate ?? true}
+          />
         </BarChart>
       </ResponsiveContainer>
     </div>

@@ -22,6 +22,7 @@ export const Renderer: React.FC<RendererProps> = ({ component, styles }) => {
   
   // All hooks must be at the top level - declare all states here
   const [chartData, setChartData] = useState<any[]>(component.data ?? []);
+  const [seriesData, setSeriesData] = useState<{[key: string]: any[]}>({});
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [listData, setListData] = useState<any[]>([]);
@@ -35,7 +36,56 @@ export const Renderer: React.FC<RendererProps> = ({ component, styles }) => {
     });
   }
 
-  // Chart and metric card data fetching effect
+  // Helper to check if a field uses dot notation (nested field like measures.value)
+  const isNestedField = (field: string | undefined) => field?.includes('.') || false;
+
+  // Chart series data fetching effect - fetches data for each series with an endpoint
+  useEffect(() => {
+    if (["bar-chart", "line-chart", "pie-chart", "radial-bar-chart", "radar-chart"].includes(component.type)) {
+      const series = component.series;
+      if (series && Array.isArray(series) && series.length > 0) {
+        // Check if any series has an endpoint to fetch
+        const seriesWithEndpoints = series.filter((s: any) => s.endpoint || s.dataSource);
+        if (seriesWithEndpoints.length > 0) {
+          setLoading(true);
+          setError(null);
+          const backendBase = process.env.REACT_APP_API_URL || "http://localhost:8000";
+          
+          const fetchPromises = seriesWithEndpoints.map((s: any) => {
+            const endpoint = s.endpoint || `/${s.dataSource}/`;
+            // Check if this series uses nested fields (e.g., measures.value) - need detailed=true
+            const labelField = s['label-field'] || s.labelField;
+            const dataField = s['data-field'] || s.dataField;
+            const needsDetailed = isNestedField(labelField) || isNestedField(dataField);
+            const detailedParam = needsDetailed ? '?detailed=true' : '';
+            const url = endpoint.startsWith("/") ? backendBase + endpoint + detailedParam : endpoint + detailedParam;
+            return axios.get(url)
+              .then((res) => {
+                let data: any[] = [];
+                if (Array.isArray(res.data)) {
+                  data = res.data;
+                } else if (res.data && typeof res.data === 'object') {
+                  const arrayKey = Object.keys(res.data).find(key => Array.isArray(res.data[key]));
+                  if (arrayKey) data = res.data[arrayKey];
+                }
+                return { seriesName: s.name, data };
+              })
+              .catch(() => ({ seriesName: s.name, data: [] }));
+          });
+          
+          Promise.all(fetchPromises)
+            .then((results) => {
+              const dataMap: {[key: string]: any[]} = {};
+              results.forEach((r) => { dataMap[r.seriesName] = r.data; });
+              setSeriesData(dataMap);
+            })
+            .finally(() => setLoading(false));
+        }
+      }
+    }
+  }, [component.type, component.series]);
+
+  // Chart and metric card data fetching effect (legacy single data_binding)
   useEffect(() => {
     if (["bar-chart", "line-chart", "pie-chart", "radial-bar-chart", "radar-chart", "metric-card", "table"].includes(component.type)) {
       const endpoint = component.data_binding?.endpoint;
@@ -43,15 +93,19 @@ export const Renderer: React.FC<RendererProps> = ({ component, styles }) => {
         setLoading(true);
         setError(null);
         // Always use backend base URL for relative endpoints
-        const backendBase = "http://localhost:8000";
+        const backendBase = process.env.REACT_APP_API_URL || "http://localhost:8000";
         
         // Check if table has lookup columns - if so, request detailed data with joins
         const hasLookupColumns = component.chart?.columns?.some(
           (col: any) => typeof col === 'object' && col.column_type === 'lookup'
         );
         
-        // Add detailed=true query param if there are lookup columns
-        const urlParams = hasLookupColumns ? '?detailed=true' : '';
+        // Check if data_binding uses nested fields (dot notation like measures.value)
+        const hasNestedFields = isNestedField(component.data_binding?.label_field) || 
+                                isNestedField(component.data_binding?.data_field);
+        
+        // Add detailed=true query param if there are lookup columns or nested fields
+        const urlParams = (hasLookupColumns || hasNestedFields) ? '?detailed=true' : '';
         const url = endpoint.startsWith("/") 
           ? backendBase + endpoint + urlParams
           : endpoint + urlParams;
@@ -93,63 +147,13 @@ export const Renderer: React.FC<RendererProps> = ({ component, styles }) => {
     }
   }, [component.type, component.data_binding?.endpoint]);
 
-  // PSA: Making sure we are picking up the correct data binding
-  useEffect(() => {
-  if (component.type === "line-chart") {
-    const endpoint = component.data_binding?.endpoint;
-    if (endpoint) {
-      setLoading(true);
-      setError(null);
-      const backendBase = "http://localhost:8000";
-      axios
-        .get(`${backendBase}${endpoint}`)
-        .then((res) => {
-          let data: any[] = res.data;
-          console.log("Fetched chart data:", data);  // Debugging line
-          setChartData(data);
-        })
-        .catch((err) => {
-          setError("Error loading data");
-          setChartData([]);
-        })
-        .finally(() => setLoading(false));
-    }
-  }
-}, [component]);
-
-useEffect(() => {
-  if (component.type === "radar-chart") {
-    const endpoint = component.data_binding?.endpoint;
-    if (endpoint) {
-      setLoading(true);
-      setError(null);
-      const backendBase = "http://localhost:8000";
-      axios
-        .get(`${backendBase}${endpoint}`)
-        .then((res) => {
-          let data: any[] = res.data;
-          console.log("Fetched data for Radar Chart:", data);  // Log the data
-          setChartData(data);  // Set the chart data
-        })
-        .catch((err) => {
-          setError("Error loading data");
-          setChartData([]);
-        })
-        .finally(() => setLoading(false));
-    }
-  }
-}, [component]);
-
-
-
-
   // Data list fetching effect
   useEffect(() => {
     if (component.type === "data-list" && component.data_sources && component.data_sources.length > 0) {
       const source = component.data_sources[0];
       const endpoint = source.endpoint || `/${source.domain?.toLowerCase()}/`;
       if (endpoint) {
-        const backendBase = "http://localhost:8000";
+        const backendBase = process.env.REACT_APP_API_URL || "http://localhost:8000";
         const url = endpoint.startsWith("/") ? backendBase + endpoint : endpoint;
         axios.get(url)
           .then((res) => {
@@ -242,7 +246,7 @@ useEffect(() => {
           instanceSourceTableId={instanceSource}
           className={component.class_list?.join(' ')}
           style={style}
-          backendUrl="http://localhost:8000"
+          backendUrl={process.env.REACT_APP_API_URL || "http://localhost:8000"}
         />
       );
     }
@@ -260,7 +264,7 @@ useEffect(() => {
           isClassMethod={methodConfig.is_class_method || false}
           className={component.class_list?.join(' ')}
           style={style}
-          backendUrl="http://localhost:8000"
+          backendUrl={process.env.REACT_APP_API_URL || "http://localhost:8000"}
         />
       );
     }
@@ -450,7 +454,51 @@ useEffect(() => {
       />
     );
   }
-  
+  if (component.type === "radar-chart") {
+    if (loading) return <div id={component.id}>Loading data...</div>;
+    if (error) return <div id={component.id}>{error}</div>;
+    
+    // Use configured field names from data_binding, with intelligent fallback
+    let actualLabelField = component.data_binding?.label_field || "name";
+    let actualDataField = component.data_binding?.data_field || "value";
+    
+    // If data_binding fields look like UUIDs (contain hyphens and are long), detect from data
+    const isUUID = (str: string) => str && str.length > 20 && str.includes('-');
+    
+    if ((isUUID(actualLabelField) || isUUID(actualDataField)) && chartData && chartData.length > 0) {
+      const firstItem = chartData[0];
+      const keys = Object.keys(firstItem);
+      
+      if (isUUID(actualLabelField)) {
+        actualLabelField = keys.find(k => ['name', 'label', 'attribute'].includes(k.toLowerCase())) || 
+                          keys.find(k => typeof firstItem[k] === 'string') || 
+                          'name';
+      }
+      
+      if (isUUID(actualDataField)) {
+        actualDataField = keys.find(k => ['value', 'count', 'amount'].includes(k.toLowerCase())) || 
+                         keys.find(k => typeof firstItem[k] === 'number') || 
+                         'value';
+      }
+      
+      console.log(`[Radar Chart] Detected fields from data - labelField: ${actualLabelField}, dataField: ${actualDataField}`);
+    } else {
+      console.log(`[Radar Chart] Using configured fields - labelField: ${actualLabelField}, dataField: ${actualDataField}`);
+    }
+    
+    return (
+      <RadarChartComponent
+        id={component.id}
+        title={component.title || component.name}
+        color={component.color}
+        data={chartData}
+        labelField={actualLabelField}
+        dataField={actualDataField}
+        options={component.chart || {}}
+        styles={style}
+      />
+    );
+  }
 
   if (component.type === "bar-chart") {
     if (loading) return <div id={component.id}>Loading data...</div>;
@@ -502,8 +550,20 @@ useEffect(() => {
     if (loading) return <div id={component.id}>Loading data...</div>;
     if (error) return <div id={component.id}>{error}</div>;
     
+    // Check if we have series with data bindings
+    const hasSeries = component.series && Array.isArray(component.series) && component.series.length > 0;
+    
+    // Prepare series with fetched data
+    const preparedSeries = hasSeries ? component.series.map((s: any) => {
+      const fetchedData = seriesData[s.name] || [];
+      return {
+        ...s,
+        fetchedData: fetchedData,
+      };
+    }) : [];
+    
     // Use configured field names from data_binding, with intelligent fallback
-    let actualLabelField = component.data_binding?.label_field || "pid";
+    let actualLabelField = component.data_binding?.label_field || "name";
     let actualDataField = component.data_binding?.data_field || "value";
     
     // If data_binding fields look like UUIDs (contain hyphens and are long), detect from data
@@ -514,7 +574,7 @@ useEffect(() => {
       const keys = Object.keys(firstItem);
       
       if (isUUID(actualLabelField)) {
-        actualLabelField = keys.find(k => ['pid','name', 'label', 'attribute'].includes(k.toLowerCase())) || 
+        actualLabelField = keys.find(k => ['name', 'label', 'attribute'].includes(k.toLowerCase())) || 
                           keys.find(k => typeof firstItem[k] === 'string') || 
                           'name';
       }
@@ -536,6 +596,7 @@ useEffect(() => {
         title={component.title || component.name}
         color={component.color}
         data={chartData}
+        series={preparedSeries}
         labelField={actualLabelField}
         dataField={actualDataField}
         options={component.chart || {}}
@@ -604,60 +665,6 @@ useEffect(() => {
         value={metricValue}
         trend={12}
         data_binding={component.data_binding}
-      />
-    );
-  }
-
-  if (component.type === "radar-chart") {
-    if (loading) return <div id={component.id}>Loading data...</div>;
-    if (error) return <div id={component.id}>{error}</div>;
-    
-    // Use configured field names from data_binding, with intelligent fallback
-    let actualLabelField = component.data_binding?.label_field || "pid";
-    let actualDataField = component.data_binding?.data_field || "value";
-    
-    // If data_binding fields look like UUIDs (contain hyphens and are long), detect from data
-    const isUUID = (str: string) => str && str.length > 20 && str.includes('-');
-    
-    if ((isUUID(actualLabelField) || isUUID(actualDataField)) && chartData && chartData.length > 0) {
-      const firstItem = chartData[0];
-      const keys = Object.keys(firstItem);
-      
-      if (isUUID(actualLabelField)) {
-        actualLabelField = keys.find(k => ['name', 'label', 'attribute'].includes(k.toLowerCase())) || 
-                          keys.find(k => typeof firstItem[k] === 'string') || 
-                          'name';
-      }
-      
-      if (isUUID(actualDataField)) {
-        actualDataField = keys.find(k => ['value', 'count', 'amount'].includes(k.toLowerCase())) || 
-                         keys.find(k => typeof firstItem[k] === 'number') || 
-                         'value';
-      }
-      
-      console.log(`[Radar Chart] Detected fields from data - labelField: ${actualLabelField}, dataField: ${actualDataField}`);
-    } else {
-      console.log(`[Radar Chart] Using configured fields - labelField: ${actualLabelField}, dataField: ${actualDataField}`);
-    }
-    
-    console.log("Fetched data for Radar Chart:", chartData);
-
-    const dummyData = [
-  { pid: "Alfred", "A1 Grammar": 38.46, "A2 Total": 39.42 },
-  { pid: "Aya-23", "A1 Grammar": 38.46, "A2 Total": 30.77 },
-  { pid: "Aya-23 - 35B", "A1 Grammar": 34.62, "A2 Total": 37.5 }
-];
-    
-    return (
-      <RadarChartComponent
-        id={component.id}
-        title={component.title || component.name}
-        color={component.color}
-        data={dummyData}
-        labelField={actualLabelField}
-        dataField={actualDataField}
-        options={component.chart || {}}
-        styles={style}
       />
     );
   }
