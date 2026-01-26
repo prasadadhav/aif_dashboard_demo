@@ -161,17 +161,18 @@
                               "endpoint": "/metric/",
                               "label": "Mistral",
                               "labelField": "name",
-                              "filter": { "name": "Mistral" },
-                              "name": "Mistral"
+                              "name": "Mistral",
+                              "filter": "model_name == \"Mistral\""
                             },
                             {
                               "color": "#7e29ff",
                               "dataField": "measures.value",
                               "dataSource": "metric",
                               "endpoint": "/metric/",
-                              "label": "Series 2",
+                              "label": "Claude 3.5 Sonnet 2",
                               "labelField": "name",
-                              "name": "Series_2"
+                              "name": "Claude 3.5 Sonnet",
+                              "filter": "model_name == \"Claude 3.5 Sonnet\""
                             }
                           ],
                           "title": "Line Chart",
@@ -224,22 +225,24 @@
                           "name": "Bar Chart",
                           "series": [
                             {
-                              "color": "#3498db",
+                              "color": "#f51313",
                               "dataField": "measures.value",
                               "dataSource": "metric",
                               "endpoint": "/metric/",
-                              "label": "Series 1",
+                              "label": "Mistral",
                               "labelField": "name",
-                              "name": "Series_1"
+                              "name": "Mistral",
+                              "filter": "model_name == \"Mistral\""
                             },
                             {
-                              "color": "#00C49F",
+                              "color": "#7e29ff",
                               "dataField": "measures.value",
                               "dataSource": "metric",
                               "endpoint": "/metric/",
-                              "label": "Series 2",
+                              "label": "Claude 3.5 Sonnet 2",
                               "labelField": "name",
-                              "name": "Series_2"
+                              "name": "Claude 3.5 Sonnet",
+                              "filter": "model_name == \"Claude 3.5 Sonnet\""
                             }
                           ],
                           "title": "Bar Chart",
@@ -292,18 +295,20 @@
                               "dataField": "measures.value",
                               "dataSource": "metric",
                               "endpoint": "/metric/",
-                              "label": "Series 1",
+                              "label": "Mistral",
                               "labelField": "name",
-                              "name": "Series_1"
+                              "name": "Mistral",
+                              "filter": "model_name == \"Mistral\""
                             },
                             {
                               "color": "#2196F3",
                               "dataField": "measures.value",
                               "dataSource": "metric",
                               "endpoint": "/metric/",
-                              "label": "Series 2",
+                              "label": "Claude 3.5 Sonnet 2",
                               "labelField": "name",
-                              "name": "Series_2"
+                              "name": "Claude 3.5 Sonnet",
+                              "filter": "model_name == \"Claude 3.5 Sonnet\""
                             }
                           ],
                           "title": "Radar Chart",

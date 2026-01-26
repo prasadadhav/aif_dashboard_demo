@@ -103,13 +103,16 @@ export const Renderer: React.FC<RendererProps> = ({ component, styles }) => {
 
       sourceData.forEach((item: any) => {
         const label = getNestedValue(item, s.labelField) ?? item?.[s.labelField] ?? item?.name ?? item?.label ?? "";
-        const value = toNumeric(getNestedValue(item, s.dataField) ?? item?.[s.dataField] ?? item?.value);
+        // const value = toNumeric(getNestedValue(item, s.dataField) ?? item?.[s.dataField] ?? item?.value);
+        const v = getSeriesValue(item, s);
+        if (v === null) return;
         const key = String(label ?? "");
 
         if (!combined[key]) {
           combined[key] = { name: key };
         }
-        combined[key][s.name] = value;
+        // combined[key][s.name] = value;
+        combined[key][s.name] = v;
       });
     });
 
@@ -127,6 +130,60 @@ export const Renderer: React.FC<RendererProps> = ({ component, styles }) => {
       fetchedData: seriesDataMap[resolveSeriesName(s, index)] ?? s.fetchedData,
     }));
   };
+
+  // PSA Helper
+  type FilterRule =
+  | { field: "model_name" | "model_pid"; op: "eq" | "contains"; value: string }
+  | null;
+
+const parseFilterRule = (filter?: string): FilterRule => {
+  if (!filter || typeof filter !== "string") return null;
+
+  // model_name == "Mistral"
+  let m = filter.match(/(model_name|model_pid)\s*==\s*["']([^"']+)["']/i);
+  if (m) return { field: m[1] as any, op: "eq", value: m[2] };
+
+  // model_name contains "Mistral"
+  m = filter.match(/(model_name|model_pid)\s*contains\s*["']([^"']+)["']/i);
+  if (m) return { field: m[1] as any, op: "contains", value: m[2] };
+
+  // allow shorthand: "Mistral" (treat as contains on model_name)
+  return { field: "model_name", op: "contains", value: filter.trim() };
+};
+
+const measureMatches = (measure: any, rule: FilterRule) => {
+  if (!rule) return true;
+  const v = String(measure?.[rule.field] ?? "");
+  if (rule.op === "eq") return v === rule.value;
+  return v.toLowerCase().includes(rule.value.toLowerCase());
+};
+
+/**
+ * If dataField is "measures.value" (or measures.something),
+ * pick the measure that matches the series.filter and read the rest of the path from it.
+ */
+const getSeriesValue = (metricRow: any, seriesCfg: any): number | null => {
+  const df: string = seriesCfg.dataField || "value";
+  const rule = parseFilterRule(seriesCfg.filter);
+
+  // Nested case: measures.value
+  if (df.startsWith("measures.")) {
+    const measures = Array.isArray(metricRow?.measures) ? metricRow.measures : [];
+    const chosen = measures.find((m: any) => measureMatches(m, rule));
+    if (!chosen) return null;
+
+    const innerPath = df.replace(/^measures\./, ""); // "value"
+    const raw = getNestedValue(chosen, innerPath) ?? chosen?.[innerPath];
+    const num = typeof raw === "number" ? raw : parseFloat(raw);
+    return Number.isFinite(num) ? num : 0;
+  }
+
+  // Non-nested: just read from the row
+  const raw = getNestedValue(metricRow, df) ?? metricRow?.[df];
+  const num = typeof raw === "number" ? raw : parseFloat(raw);
+  return Number.isFinite(num) ? num : 0;
+};
+
 
   // Chart series data fetching effect - fetches data for each series with an endpoint
   useEffect(() => {
