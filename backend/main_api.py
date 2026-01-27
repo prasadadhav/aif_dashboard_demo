@@ -6280,24 +6280,45 @@ def get_all_model_debug(detailed: bool = False, database: Session = Depends(get_
         logger.exception("ERROR in /model/ endpoint")
         raise HTTPException(status_code=500, detail=str(e))
     
-
+# PSA
 from sqlalchemy import text
 from typing import Dict, Any, List
+# @app.get("/model_count_4_card/", tags=["Model"], response_model=List[Dict[str, Any]])
+# def model_count_4_card(database: Session = Depends(get_db)) -> List[Dict[str, Any]]:
+#     row = database.execute(
+#         text("""
+#             SELECT
+#               COUNT(*) AS total_rows,
+#               COUNT(DISTINCT pid) AS unique_pid,
+#               COUNT(DISTINCT source) AS unique_source,
+#               SUM(CASE WHEN licensing = 'Open_Source' THEN 1 ELSE 0 END) AS open_source_count,
+#               SUM(CASE WHEN licensing = 'Proprietary' THEN 1 ELSE 0 END) AS proprietary_count,
+#             FROM model
+#         """)
+#     ).mappings().one()
+
+#     return [dict(row)]
+
 @app.get("/model_count_4_card/", tags=["Model"], response_model=List[Dict[str, Any]])
 def model_count_4_card(database: Session = Depends(get_db)) -> List[Dict[str, Any]]:
     row = database.execute(
         text("""
             SELECT
-              COUNT(*) AS total_rows,
-              COUNT(DISTINCT pid) AS unique_pid,
-              COUNT(DISTINCT source) AS unique_source,
-              SUM(CASE WHEN licensing = 'Open_Source' THEN 1 ELSE 0 END) AS open_source_count,
-              SUM(CASE WHEN licensing = 'Proprietary' THEN 1 ELSE 0 END) AS proprietary_count
-            FROM model
+              -- model table counts
+              (SELECT COUNT(*) FROM model) AS total_rows,
+              (SELECT COUNT(DISTINCT pid) FROM model) AS unique_pid,
+              (SELECT COUNT(DISTINCT source) FROM model) AS unique_source,
+              (SELECT COUNT(*) FROM model WHERE licensing = 'Open_Source') AS open_source_count,
+              (SELECT COUNT(*) FROM model WHERE licensing = 'Proprietary') AS proprietary_count,
+
+              -- metric table counts
+              (SELECT COUNT(DISTINCT name) FROM metric) AS unique_metric_name
         """)
     ).mappings().one()
 
     return [dict(row)]
+
+
 
 
 @app.get("/model/count/", response_model=None, tags=["Model"])

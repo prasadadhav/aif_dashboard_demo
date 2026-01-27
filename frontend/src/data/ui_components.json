@@ -512,9 +512,9 @@
                               ],
                               "color": "#2c3e50",
                               "data_binding": {
-                                "data_field": "Metric",
-                                "endpoint": "/measure/",
-                                "entity": "Measure"
+                                "data_field": "unique_metric_name",
+                                "endpoint": "/model_count_4_card/",
+                                "entity": "Model"
                               },
                               "display_order": 2,
                               "id": "ilcwkv",
