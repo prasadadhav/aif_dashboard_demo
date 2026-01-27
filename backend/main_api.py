@@ -6220,7 +6220,9 @@ def model_count_4_card(database: Session = Depends(get_db)) -> List[Dict[str, An
             SELECT
               COUNT(*) AS total_rows,
               COUNT(DISTINCT pid) AS unique_pid,
-              COUNT(DISTINCT source) AS unique_source
+              COUNT(DISTINCT source) AS unique_source,
+              SUM(CASE WHEN licensing = 'Open_Source' THEN 1 ELSE 0 END) AS open_source_count,
+              SUM(CASE WHEN licensing = 'Proprietary' THEN 1 ELSE 0 END) AS proprietary_count
             FROM model
         """)
     ).mappings().one()
