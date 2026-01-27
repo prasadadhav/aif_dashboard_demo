@@ -404,8 +404,8 @@
                               ],
                               "color": "#2c3e50",
                               "data_binding": {
-                                "data_field": "source",
-                                "endpoint": "/model/",
+                                "data_field": "unique_source",
+                                "endpoint": "/model_count_4_card/",
                                 "entity": "Model"
                               },
                               "display_order": 0,
@@ -444,8 +444,8 @@
                               ],
                               "color": "#2c3e50",
                               "data_binding": {
-                                "data_field": "pid",
-                                "endpoint": "/model/",
+                                "data_field": "unique_pid",
+                                "endpoint": "/model_count_4_card/",
                                 "entity": "Model"
                               },
                               "display_order": 1,
