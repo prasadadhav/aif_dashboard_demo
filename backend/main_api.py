@@ -10,26 +10,64 @@ from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.exc import SQLAlchemyError, IntegrityError
 from pydantic_classes import *
 from sql_alchemy import *
+from sql_alchemy import Base
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+import os
+from pathlib import Path
 
 ############################################
 #
 #   Initialize the database
 #
 ############################################
+# original
+# def init_db():
+#     SQLALCHEMY_DATABASE_URL = "sqlite:////./lux_data_2026_map.db"
+#     engine = create_engine(
+#         SQLALCHEMY_DATABASE_URL, 
+#         connect_args={"check_same_thread": False},
+#         pool_size=10,
+#         max_overflow=20,
+#         pool_pre_ping=True,
+#         echo=False
+#     )
+#     SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+#     Base.metadata.create_all(bind=engine)
+#     return SessionLocal
+
+# new
+# def init_db():
+#     # Read DB URL from environment (Render sets this)
+#     database_url = os.getenv(
+#         "SQLALCHEMY_DATABASE_URL",
+#         "sqlite:///./lux_data_2026_map.db"  # fallback for safety
+#     )
+
+#     print("Using database:", database_url)
+
+#     engine = create_engine(
+#         database_url,
+#         connect_args={"check_same_thread": False}
+#         if database_url.startswith("sqlite")
+#         else {}
+#     )
+
+#     # Safe: creates tables only if they do not exist
+#     Base.metadata.create_all(bind=engine)
+
+#     return engine
 
 def init_db():
-    SQLALCHEMY_DATABASE_URL = "sqlite:///./lux_data_2026_map.db"
+    db_url = os.getenv("SQLALCHEMY_DATABASE_URL", "sqlite:///./lux_data_2026_map.db")
+    print("Using database:", db_url)
+
     engine = create_engine(
-        SQLALCHEMY_DATABASE_URL, 
-        connect_args={"check_same_thread": False},
-        pool_size=10,
-        max_overflow=20,
-        pool_pre_ping=True,
-        echo=False
+        db_url,
+        connect_args={"check_same_thread": False} if db_url.startswith("sqlite") else {}
     )
     SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
     Base.metadata.create_all(bind=engine)
@@ -85,7 +123,8 @@ app = FastAPI(
 # Enable CORS for all origins (for development)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Or restrict to ["http://localhost:3000"]
+    allow_origins=["https://ai-sandbox-dashboard-demo-frontend.onrender.com",
+        "http://localhost:3000", "*"],  # Or restrict to ["http://localhost:3000"]
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -193,6 +232,37 @@ def get_db():
         raise
     finally:
         db.close()
+# PSA
+def init_db():
+    # 1) Read from env (Render sets this), fallback to the disk path
+    db_url = os.getenv(
+        "SQLALCHEMY_DATABASE_URL",
+        "sqlite:////app/data/lux_data_2026_map.db"
+    )
+
+    logger.info(f"Using DB URL: {db_url}")
+
+    # 2) If sqlite absolute path, ensure parent dir exists (prevents 'unable to open database file')
+    if db_url.startswith("sqlite:////"):
+        db_path = Path(db_url.replace("sqlite:////", "/"))
+        db_path.parent.mkdir(parents=True, exist_ok=True)
+        logger.info(f"SQLite path: {db_path} (exists={db_path.exists()})")
+
+    # 3) Create engine
+    #    For SQLite, avoid pool_size/max_overflow; NullPool is safest on serverless-ish environments.
+    connect_args = {"check_same_thread": False} if db_url.startswith("sqlite") else {}
+    engine = create_engine(
+        db_url,
+        connect_args=connect_args,
+        poolclass=NullPool if db_url.startswith("sqlite") else None,
+        echo=False
+    )
+
+    # 4) Safe: creates tables if missing (does NOT wipe data)
+    Base.metadata.create_all(bind=engine)
+
+    # 5) Return session factory
+    return sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 ############################################
 #
@@ -7276,6 +7346,18 @@ def download_logs():
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
+
+    # PSA
+    import os
+    from pathlib import Path
+
+    db_url = os.getenv("SQLALCHEMY_DATABASE_URL", "sqlite:///./lux_data_2026_map.db")
+    print("SQLALCHEMY_DATABASE_URL =", db_url)
+
+    if db_url.startswith("sqlite:////"):
+        p = Path(db_url.replace("sqlite:////", "/"))
+        print("SQLite path:", p, "exists:", p.exists(), "size:", p.stat().st_size if p.exists() else None)
+
 
 
 
