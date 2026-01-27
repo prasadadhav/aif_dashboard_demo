@@ -3044,21 +3044,21 @@ async def get_comments(comments_id: int, database: Session = Depends(get_db)) ->
     return response_data
 
 
+# PSA
+from datetime import datetime, timezone
+now = datetime.now(timezone.utc).replace(microsecond=0)
 
 @app.post("/comments/", response_model=None, tags=["Comments"])
 async def create_comments(comments_data: CommentsCreate, database: Session = Depends(get_db)) -> Comments:
 
 
     db_comments = Comments(
-        TimeStamp=comments_data.TimeStamp,        Comments=comments_data.Comments,        Name=comments_data.Name        )
+        TimeStamp=now,        Comments=comments_data.Comments,        Name=comments_data.Name        )
 
     database.add(db_comments)
     database.commit()
     database.refresh(db_comments)
 
-
-
-    
     return db_comments
 
 
@@ -3120,7 +3120,7 @@ async def update_comments(comments_id: int, comments_data: CommentsCreate, datab
     if db_comments is None:
         raise HTTPException(status_code=404, detail="Comments not found")
 
-    setattr(db_comments, 'TimeStamp', comments_data.TimeStamp)
+    setattr(db_comments, 'TimeStamp',  datetime.now(timezone.utc).replace(microsecond=0))
     setattr(db_comments, 'Comments', comments_data.Comments)
     setattr(db_comments, 'Name', comments_data.Name)
     database.commit()
