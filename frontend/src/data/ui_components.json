@@ -850,7 +850,8 @@
                                       "name": "ijges7",
                                       "src": "https://snt-highlights.uni.lu/wp-content/uploads/sites/172/2022/01/SnT_UL_logo2020-1024x330.png",
                                       "tag": "img",
-                                      "type": "image"
+                                      "type": "image",
+                                      "class_list": ["navbar-logo"]
                                     }
                                   ],
                                   "class_list": [
@@ -879,7 +880,8 @@
                                       "name": "in1sos",
                                       "src": "https://living-in.eu/sites/default/files/images/luxembourg_list-from-website.png",
                                       "tag": "img",
-                                      "type": "image"
+                                      "type": "image",
+                                      "class_list": ["navbar-logo"]
                                     }
                                   ],
                                   "class_list": [
@@ -1383,7 +1385,8 @@
                                       "name": "iaiffx",
                                       "src": "https://snt-highlights.uni.lu/wp-content/uploads/sites/172/2022/01/SnT_UL_logo2020-1024x330.png",
                                       "tag": "img",
-                                      "type": "image"
+                                      "type": "image",
+                                      "class_list": ["navbar-logo"]
                                     }
                                   ],
                                   "class_list": [
@@ -1409,7 +1412,8 @@
                                       "name": "imr3uf",
                                       "src": "https://living-in.eu/sites/default/files/images/luxembourg_list-from-website.png",
                                       "tag": "img",
-                                      "type": "image"
+                                      "type": "image",
+                                      "class_list": ["navbar-logo"]
                                     }
                                   ],
                                   "class_list": [
@@ -2089,11 +2093,11 @@
                       "attributes": {
                         "id": "itmu2-2"
                       },
-                      "content": "Email: info@besser-pearl.org\nPhone: (123) 456-7890",
+                      "content": "Email: info@besser-pearl.org",
                       "description": "Text element",
                       "display_order": 1,
                       "id": "itmu2-2",
-                      "name": "Email: info@besser-pearl.org\nPhone: (123) 456-7890",
+                      "name": "Email: info@besser-pearl.org",
                       "tag": "p",
                       "type": "text"
                     }
@@ -2600,7 +2604,8 @@
                                       "name": "ibvpsj",
                                       "src": "https://snt-highlights.uni.lu/wp-content/uploads/sites/172/2022/01/SnT_UL_logo2020-1024x330.png",
                                       "tag": "img",
-                                      "type": "image"
+                                      "type": "image",
+                                      "class_list": ["navbar-logo"]
                                     }
                                   ],
                                   "class_list": [
@@ -2626,7 +2631,8 @@
                                       "name": "i7ktg7",
                                       "src": "https://living-in.eu/sites/default/files/images/luxembourg_list-from-website.png",
                                       "tag": "img",
-                                      "type": "image"
+                                      "type": "image",
+                                      "class_list": ["navbar-logo"]
                                     }
                                   ],
                                   "class_list": [

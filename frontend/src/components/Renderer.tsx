@@ -334,6 +334,14 @@ const getSeriesValue = (metricRow: any, seriesCfg: any): number | null => {
     const tagName = (component.tag && validTags.includes(component.tag.toLowerCase())) 
       ? component.tag.toLowerCase()
       : "div";
+
+    // PSA
+    const isNavOrFooter = tagName === "nav" || tagName === "footer" || component.class_list?.includes("dashboard-container"); // I can add section if the about page color needs to be changed
+
+    const backgroundStyle = isNavOrFooter
+      ? { background: "#001075", backgroundImage: "none", color: "#ffffff" }
+      : {};
+
     
     // Check if this is a cell and has children
     const isCell = component.class_list?.includes('gjs-cell');
@@ -351,7 +359,7 @@ const getSeriesValue = (metricRow: any, seriesCfg: any): number | null => {
       tagName,
       {
         id: component.id,
-        style: adjustedStyle,
+        style: { ...adjustedStyle, ...backgroundStyle },
         className: component.class_list?.join(' '),
         ...safeAttributes
       },
