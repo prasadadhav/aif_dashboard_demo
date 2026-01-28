@@ -640,6 +640,7 @@ export const TableComponent: React.FC<Props> = ({
                   // Validate required fields
                   const missingFields: string[] = [];
                   columns.forEach(col => {
+                     if (dataBinding?.entity === "Comments" && col.field === "TimeStamp") return;
                     if (col.required) {
                       if (col.columnType === 'lookup') {
                         if (col.type === 'list') {
@@ -674,6 +675,10 @@ export const TableComponent: React.FC<Props> = ({
                   // Process form values based on column types
                   const processedValues: Record<string, any> = {};
                   columns.forEach(col => {
+                    if (dataBinding?.entity === "Comments" && col.field === "TimeStamp") {
+                      processedValues[col.field] = new Date().toISOString().replace(/\.\d{3}Z$/, "Z");
+                      return;
+                    }
                     // For lookup columns, use the path as the API field name
                     if (col.columnType === 'lookup' && col.path) {
                       if (col.type === 'list') {
@@ -785,6 +790,14 @@ export const TableComponent: React.FC<Props> = ({
                 style={{ display: "flex", flexDirection: "column", gap: "16px" }}
               >
                 {columns.map(col => {
+                  // Hide timestamp input (auto-set server/client side)
+                  if (dataBinding?.entity === "Comments" && col.field === "TimeStamp") {
+                    return (
+                      <div key={col.field} style={{ fontSize: "13px", color: "#64748b" }}>
+                        <strong>{col.label}:</strong> set automatically when you save
+                      </div>
+                    );
+                  }
                   // For lookup columns, render a select dropdown
                   if (col.columnType === 'lookup' && col.entity) {
                     const endpoint = col.entity.toLowerCase();
