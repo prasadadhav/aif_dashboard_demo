@@ -49,6 +49,22 @@
   color: #ffffff;
 }
 
+/* PSA */
+.navbar-logo {
+  width: 231px;
+  height: 77px;
+  object-fit: contain;
+}
+
+img.navbar-logo {
+  width: 231px !important;
+  height: 77px !important;
+  object-fit: contain !important;
+  max-width: 231px !important;
+  max-height: 77px !important;
+}
+
+
 .app-main {
   flex: 1;
   width: 100%;

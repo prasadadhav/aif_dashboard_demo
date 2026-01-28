@@ -230,7 +230,7 @@ const getSeriesValue = (metricRow: any, seriesCfg: any): number | null => {
         }
       }
     }
-  }, [component.type, component.series]); 
+  }, [component.type, component.series]);
 
   // Chart and metric card data fetching effect (legacy single data_binding)
   useEffect(() => {
@@ -470,7 +470,7 @@ const getSeriesValue = (metricRow: any, seriesCfg: any): number | null => {
         navigate(component.target_screen_path);
       }
     };
-
+    
     
     // Filter out 'style' from attributes
     const { style: _, ...safeAttributes } = component.attributes || {};
@@ -518,21 +518,45 @@ const getSeriesValue = (metricRow: any, seriesCfg: any): number | null => {
     );
   }
 
-  if (component.type === "image") {
-    // Filter out 'style' from attributes
-    const { style: _, ...safeAttributes } = component.attributes || {};
+  // if (component.type === "image") {
+  //   console.log("RENDER IMAGE", component.id, component.class_list, component.attributes);
+  //   // Filter out 'style' from attributes
+  //   const { style: _, ...safeAttributes } = component.attributes || {};
     
-    return (
-      <img
-        id={component.id}
-        src={component.src || ""}
-        alt={component.alt || component.description || ""}
-        style={style}
-        className={component.class_list?.join(' ')}
-        {...safeAttributes}
-      />
-    );
-  }
+  //   return (
+  //     <img
+  //       id={component.id}
+  //       src={component.src || ""}
+  //       alt={component.alt || component.description || ""}
+  //       style={{ ...style, border: "5px solid red" }}
+  //       className={component.class_list?.join(' ')}
+  //       {...safeAttributes}
+  //     />
+  //   );
+  // }
+
+  // PSA
+  if (component.type === "image") {
+  const { style: _, ...safeAttributes } = component.attributes || {};
+
+  const isNavbarLogo = component.class_list?.includes("navbar-logo");
+
+  const logoStyle = isNavbarLogo
+    ? { width: "231px", height: "77px", objectFit: "contain", display: "block" }
+    : {};
+
+  return (
+    <img
+      id={component.id}
+      src={component.src || ""}
+      alt={component.alt || component.description || ""}
+      className={component.class_list?.join(" ")}
+      style={{ ...style, ...logoStyle }}
+      {...safeAttributes}
+    />
+  );
+}
+
 
   if (component.type === "input") {
     // Filter out 'style' from attributes
