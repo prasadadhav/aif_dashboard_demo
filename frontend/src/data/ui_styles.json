@@ -40,7 +40,7 @@
         "background": "linear-gradient(135deg, #4b3c82 0%, #5a3d91 100%)",
         "color": "white",
         "display": "flex",
-        "fontFamily": "Arial, sans-serif",
+        "fontFamily": "'Lato'",
         "justifyContent": "space-between",
         "padding": "15px 30px"
       }
@@ -325,7 +325,7 @@
         "--chart-color-palette": "default",
         "background": "linear-gradient(135deg, #4b3c82 0%, #5a3d91 100%)",
         "color": "white",
-        "fontFamily": "Arial, sans-serif",
+        "fontFamily": "'Lato'",
         "padding": "40px 20px"
       }
     },
@@ -422,7 +422,7 @@
         "backgroundSize": "auto",
         "color": "white",
         "display": "flex",
-        "fontFamily": "Arial, sans-serif",
+        "fontFamily": "'Lato'",
         "justifyContent": "space-between",
         "paddingBottom": "15px",
         "paddingLeft": "30px",
@@ -508,7 +508,7 @@
         "backgroundRepeat": "repeat",
         "backgroundSize": "auto",
         "color": "white",
-        "fontFamily": "Arial, sans-serif",
+        "fontFamily": "'Lato'",
         "paddingBottom": "80px",
         "paddingLeft": "20px",
         "paddingRight": "20px",
@@ -898,7 +898,7 @@
         "backgroundRepeat": "repeat",
         "backgroundSize": "auto",
         "color": "white",
-        "fontFamily": "Arial, sans-serif",
+        "fontFamily": "'Lato'",
         "marginTop": "60px",
         "paddingBottom": "40px",
         "paddingLeft": "20px",
@@ -1082,7 +1082,7 @@
         "background": "linear-gradient(135deg, #4b3c82 0%, #5a3d91 100%)",
         "color": "white",
         "display": "flex",
-        "fontFamily": "Arial, sans-serif",
+        "fontFamily": "'Lato'",
         "justifyContent": "space-between",
         "padding": "15px 30px"
       }
@@ -1327,7 +1327,7 @@
         "--chart-color-palette": "default",
         "background": "linear-gradient(135deg, #4b3c82 0%, #5a3d91 100%)",
         "color": "white",
-        "fontFamily": "Arial, sans-serif",
+        "fontFamily": "'Lato'",
         "padding": "40px 20px"
       }
     },
@@ -1446,7 +1446,7 @@
         "background": "linear-gradient(135deg, #4b3c82 0%, #5a3d91 100%)",
         "color": "white",
         "display": "flex",
-        "fontFamily": "Arial, sans-serif",
+        "fontFamily": "'Lato'",
         "justifyContent": "space-between",
         "padding": "15px 30px"
       }
@@ -1691,7 +1691,7 @@
         "--chart-color-palette": "default",
         "background": "linear-gradient(135deg, #4b3c82 0%, #5a3d91 100%)",
         "color": "white",
-        "fontFamily": "Arial, sans-serif",
+        "fontFamily": "'Lato'",
         "padding": "40px 20px"
       }
     },
