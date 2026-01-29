@@ -851,7 +851,7 @@
                                       "src": "https://snt-highlights.uni.lu/wp-content/uploads/sites/172/2022/01/SnT_UL_logo2020-1024x330.png",
                                       "tag": "img",
                                       "type": "image",
-                                      "class_list": ["navbar-logo"]
+                                      "class_list": ["bottombar-logo-snt"]
                                     }
                                   ],
                                   "class_list": [
@@ -881,7 +881,7 @@
                                       "src": "https://living-in.eu/sites/default/files/images/luxembourg_list-from-website.png",
                                       "tag": "img",
                                       "type": "image",
-                                      "class_list": ["navbar-logo"]
+                                      "class_list": ["bottombar-logo-list"]
                                     }
                                   ],
                                   "class_list": [
@@ -1386,7 +1386,7 @@
                                       "src": "https://snt-highlights.uni.lu/wp-content/uploads/sites/172/2022/01/SnT_UL_logo2020-1024x330.png",
                                       "tag": "img",
                                       "type": "image",
-                                      "class_list": ["navbar-logo"]
+                                      "class_list": ["bottombar-logo-snt"]
                                     }
                                   ],
                                   "class_list": [
@@ -1413,7 +1413,7 @@
                                       "src": "https://living-in.eu/sites/default/files/images/luxembourg_list-from-website.png",
                                       "tag": "img",
                                       "type": "image",
-                                      "class_list": ["navbar-logo"]
+                                      "class_list": ["bottombar-logo-list"]
                                     }
                                   ],
                                   "class_list": [
@@ -2605,7 +2605,7 @@
                                       "src": "https://snt-highlights.uni.lu/wp-content/uploads/sites/172/2022/01/SnT_UL_logo2020-1024x330.png",
                                       "tag": "img",
                                       "type": "image",
-                                      "class_list": ["navbar-logo"]
+                                      "class_list": ["bottombar-logo-snt"]
                                     }
                                   ],
                                   "class_list": [
@@ -2632,7 +2632,7 @@
                                       "src": "https://living-in.eu/sites/default/files/images/luxembourg_list-from-website.png",
                                       "tag": "img",
                                       "type": "image",
-                                      "class_list": ["navbar-logo"]
+                                      "class_list": ["bottombar-logo-list"]
                                     }
                                   ],
                                   "class_list": [

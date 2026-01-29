@@ -57,23 +57,27 @@
 }
 
 .bottombar-logo-snt {
-  width: 150px !important;
+  width: 100px !important;
   object-fit: contain !important;
+  max-width: 100px !important;
 }
 
 .bottombar-logo-list {
-  width: 200px  !important;
+  width: 100px  !important;
   object-fit: contain !important;
+  max-width: 100px !important;
 }
 
 img.bottombar-logo-snt {
-  width: 150px !important;
+  width: 100px !important;
   object-fit: contain !important;
+  max-width: 100px !important;
 }
 
 img.bottombar-logo-list {
-  width: 200px  !important;
+  width: 100px  !important;
   object-fit: contain !important;
+  max-width: 100px !important;
 }
 
 img.navbar-logo {

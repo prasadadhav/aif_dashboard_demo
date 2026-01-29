@@ -548,10 +548,22 @@ const getSeriesValue = (metricRow: any, seriesCfg: any): number | null => {
   const { style: _, ...safeAttributes } = component.attributes || {};
 
   const isNavbarLogo = component.class_list?.includes("navbar-logo");
+  const islistLogo = component.class_list?.includes("bottombar-logo-list");
+  const isSntLogo = component.class_list?.includes("bottombar-logo-snt");
 
   const logoStyle = isNavbarLogo
     ? { width: "231px", height: "77px", objectFit: "contain", display: "block" }
     : {};
+
+  const logoStyleList = islistLogo
+    ? { width: "150px", height: "auto", objectFit: "contain", display: "block" }
+    : {};
+
+  const logoStyleSnt = isSntLogo
+    ? { width: "150px", height: "auto", objectFit: "contain", display: "block" }
+    : {};
+
+  
 
   return (
     <img
@@ -559,11 +571,53 @@ const getSeriesValue = (metricRow: any, seriesCfg: any): number | null => {
       src={component.src || ""}
       alt={component.alt || component.description || ""}
       className={component.class_list?.join(" ")}
-      style={{ ...style, ...logoStyle }}
+      style={{ ...style, ...logoStyle, ...logoStyleList, ...logoStyleSnt }}
       {...safeAttributes}
     />
   );
 }
+
+// if (component.type === "image") {
+//   const { style: _, ...safeAttributes } = component.attributes || {};
+
+//   const islistLogo = component.class_list?.includes("bottombar-logo-list");
+
+//   const logoStyle = islistLogo
+//     ? { width: "100", objectFit: "contain", display: "block" }
+//     : {};
+
+//   return (
+//     <img
+//       id={component.id}
+//       src={component.src || ""}
+//       alt={component.alt || component.description || ""}
+//       className={component.class_list?.join(" ")}
+//       style={{ ...style, ...logoStyle }}
+//       {...safeAttributes}
+//     />
+//   );
+// }
+
+// if (component.type === "image") {
+//   const { style: _, ...safeAttributes } = component.attributes || {};
+
+//   const isSntLogo = component.class_list?.includes("bottombar-logo-snt");
+
+//   const logoStyle = isSntLogo
+//     ? { width: "100", objectFit: "contain", display: "block" }
+//     : {};
+
+//   return (
+//     <img
+//       id={component.id}
+//       src={component.src || ""}
+//       alt={component.alt || component.description || ""}
+//       className={component.class_list?.join(" ")}
+//       style={{ ...style, ...logoStyle }}
+//       {...safeAttributes}
+//     />
+//   );
+// }
 
 
   if (component.type === "input") {
