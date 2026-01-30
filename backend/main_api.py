@@ -27,6 +27,7 @@ logger = logging.getLogger(__name__)
 import os
 from pathlib import Path
 
+
 ############################################
 #
 #   Initialize the database
@@ -93,7 +94,7 @@ from pathlib import Path
 def init_db():
     db_url = os.getenv("SQLALCHEMY_DATABASE_URL", "sqlite:///./lux_data_2026_map.db")
     print("Using database:", db_url)
- 
+
     engine = create_engine(
         db_url,
         connect_args={"check_same_thread": False} if db_url.startswith("sqlite") else {}
@@ -110,8 +111,8 @@ def init_db():
 ######################################################################
 
 
-
-
+IMMUDB_HOST = os.getenv("IMMUDB_HOST", "immudb")
+IMMUDB_PORT = os.getenv("IMMUDB_PORT", "3322")
 
 
 def init_immudb(client: ImmudbClient):
@@ -132,15 +133,26 @@ def init_immudb(client: ImmudbClient):
     try:
         client.sqlExec(
             """
-            CREATE TABLE IF NOT EXISTS comments_audit_v2 (
-                tx_id        INTEGER,
-                action       VARCHAR,
-                entity       VARCHAR,
-                entity_id    INTEGER,
-                payload      VARCHAR,
-                created_at   INTEGER,
-                PRIMARY KEY (tx_id)
+            CREATE TABLE IF NOT EXISTS comments_audit_v2
+            (
+                tx_id
+                INTEGER,
+                action
+                VARCHAR,
+                entity
+                VARCHAR,
+                entity_id
+                INTEGER,
+                payload
+                VARCHAR,
+                created_at
+                INTEGER,
+                PRIMARY
+                KEY
+            (
+                tx_id
             )
+                )
             """,
             {}
         )
@@ -150,10 +162,11 @@ def init_immudb(client: ImmudbClient):
         raise
 
 
-
 from typing import Optional, Dict
+
+
 def immudb_exec(sql: str, params: Optional[Dict] = None):
-    client = ImmudbClient("immudb:3322")
+    client = ImmudbClient(f"{IMMUDB_HOST}:{IMMUDB_PORT}")
 
     client.login(
         os.getenv("IMMUDB_USER", "immudb"),
@@ -172,10 +185,10 @@ def immudb_exec(sql: str, params: Optional[Dict] = None):
 
 
 def immudb_log(
-    action: str,
-    entity: str,
-    entity_id: int,
-    payload: dict,
+        action: str,
+        entity: str,
+        entity_id: int,
+        payload: dict,
 ):
     import time
     import json
@@ -193,7 +206,7 @@ def immudb_log(
         f"action :{action}, type:f'{type(action)} , entity:{entity}, type :f'{type(entity)} , entity_id:{entity_id} type : f'{type(entity_id)} safe_payload:{safe_payload} type of safe_payload: f'{type(safe_payload)}"
     )
 
-    client = ImmudbClient("immudb:3322")
+    client = ImmudbClient(f"{IMMUDB_HOST}:{IMMUDB_PORT}")
 
     try:
         client.login(
@@ -206,7 +219,7 @@ def immudb_log(
         client.sqlExec(
             """
             INSERT INTO comments_audit_v2
-            (tx_id, action, entity, entity_id, payload, created_at)
+                (tx_id, action, entity, entity_id, payload, created_at)
             VALUES (@tx_id, @action, @entity, @entity_id, @payload, @created_at)
             """,
             {
@@ -227,7 +240,6 @@ def immudb_log(
             client.logout()
         except Exception:
             pass
-
 
 
 app = FastAPI(
@@ -293,21 +305,24 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["https://ai-sandbox-dashboard-demo-frontend.onrender.com",
-        "http://localhost:3000", "*"],  # Or restrict to ["http://localhost:3000"]
+                   "http://localhost:3000", "*"],  # Or restrict to ["http://localhost:3000"]
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
+
 @app.on_event("startup")
 def startup_event():
-    client = ImmudbClient("immudb:3322")
+    client = ImmudbClient(f"{IMMUDB_HOST}:{IMMUDB_PORT}")
     client.login(
         os.getenv("IMMUDB_USER", "immudb"),
         os.getenv("IMMUDB_PASSWORD", "immudb"),
     )
     init_immudb(client)
     client.logout()
+
+
 ############################################
 #
 #   Middleware
@@ -323,6 +338,7 @@ async def log_requests(request: Request, call_next):
     logger.info(f"Response status: {response.status_code}")
     return response
 
+
 # Request timing middleware
 @app.middleware("http")
 async def add_process_time_header(request: Request, call_next):
@@ -332,6 +348,7 @@ async def add_process_time_header(request: Request, call_next):
     process_time = time_module.time() - start_time
     response.headers["X-Process-Time"] = str(process_time)
     return response
+
 
 ############################################
 #
@@ -356,16 +373,10 @@ async def value_error_handler(request: Request, exc: ValueError):
 @app.get("/audit/logs")
 def get_audit_logs():
     rows = immudb_exec("""
-        SELECT
-            tx_id,
-            action,
-            entity,
-            entity_id,
-            payload,
-            created_at
-        FROM comments_audit_v2
-        ORDER BY tx_id DESC
-    """)
+                       SELECT tx_id, action, entity, entity_id, payload, created_at
+                       FROM comments_audit_v2
+                       ORDER BY tx_id DESC
+                       """)
 
     return [
         {
@@ -384,10 +395,10 @@ def get_audit_logs():
 async def integrity_error_handler(request: Request, exc: IntegrityError):
     """Handle database integrity errors."""
     logger.error(f"Database integrity error: {exc}")
-    
+
     # Extract more detailed error information
     error_detail = str(exc.orig) if hasattr(exc, 'orig') else str(exc)
-    
+
     return JSONResponse(
         status_code=status.HTTP_409_CONFLICT,
         content={
@@ -405,7 +416,7 @@ async def sqlalchemy_error_handler(request: Request, exc: SQLAlchemyError):
     return JSONResponse(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
         content={
-            "error": "Internal Server Error", 
+            "error": "Internal Server Error",
             "message": "Database operation failed",
             "detail": "An internal database error occurred"
         }
@@ -424,8 +435,11 @@ async def http_exception_handler(request: Request, exc: HTTPException):
         }
     )
 
+
 # Initialize database session
 SessionLocal = init_db()
+
+
 # Dependency to get DB session
 def get_db():
     db = SessionLocal()
@@ -437,6 +451,7 @@ def get_db():
         raise
     finally:
         db.close()
+
 
 ############################################
 #
@@ -491,6 +506,7 @@ def get_statistics(database: Session = Depends(get_db)):
     stats["total_entities"] = sum(stats.values())
     return stats
 
+
 ############################################
 #
 #   Comments functions
@@ -500,7 +516,7 @@ def get_statistics(database: Session = Depends(get_db)):
 @app.get("/comments/", response_model=None, tags=["Comments"])
 def get_all_comments(detailed: bool = False, database: Session = Depends(get_db)) -> list:
     from sqlalchemy.orm import joinedload
-    
+
     return database.query(Comments).all()
 
 
@@ -512,7 +528,8 @@ def get_count_comments(database: Session = Depends(get_db)) -> dict:
 
 
 @app.get("/comments/paginated/", response_model=None, tags=["Comments"])
-def get_paginated_comments(skip: int = 0, limit: int = 100, detailed: bool = False, database: Session = Depends(get_db)) -> dict:
+def get_paginated_comments(skip: int = 0, limit: int = 100, detailed: bool = False,
+                           database: Session = Depends(get_db)) -> dict:
     """Get paginated list of Comments entities"""
     total = database.query(Comments).count()
     comments_list = database.query(Comments).offset(skip).limit(limit).all()
@@ -526,12 +543,11 @@ def get_paginated_comments(skip: int = 0, limit: int = 100, detailed: bool = Fal
 
 @app.get("/comments/search/", response_model=None, tags=["Comments"])
 def search_comments(
-    database: Session = Depends(get_db)
+        database: Session = Depends(get_db)
 ) -> list:
     """Search Comments entities by attributes"""
     query = database.query(Comments)
-    
-    
+
     results = query.all()
     return results
 
@@ -544,15 +560,14 @@ async def get_comments(comments_id: int, database: Session = Depends(get_db)) ->
 
     response_data = {
         "comments": db_comments,
-}
+    }
     return response_data
-
 
 
 @app.post("/comments/", response_model=None, tags=["Comments"])
 async def create_comments(
-    comments_data: CommentsCreate,
-    database: Session = Depends(get_db),
+        comments_data: CommentsCreate,
+        database: Session = Depends(get_db),
 ):
     db_comments = Comments(
         Name=comments_data.Name,
@@ -586,7 +601,7 @@ async def bulk_create_comments(items: list[CommentsCreate], database: Session = 
             # Basic validation for each item
 
             db_comments = Comments(
-                Name=item_data.Name,                TimeStamp=item_data.TimeStamp,                Comments=item_data.Comments            )
+                Name=item_data.Name, TimeStamp=item_data.TimeStamp, Comments=item_data.Comments)
             database.add(db_comments)
             database.flush()  # Get ID without committing
             created_items.append(db_comments.id)
@@ -627,11 +642,12 @@ async def bulk_delete_comments(ids: list[int], database: Session = Depends(get_d
         "message": f"Successfully deleted {deleted_count} Comments entities"
     }
 
+
 @app.put("/comments/{comments_id}/", response_model=None, tags=["Comments"])
 async def update_comments(
-    comments_id: int,
-    comments_data: CommentsCreate,
-    database: Session = Depends(get_db),
+        comments_id: int,
+        comments_data: CommentsCreate,
+        database: Session = Depends(get_db),
 ):
     db_comments = (
         database.query(Comments)
@@ -662,8 +678,8 @@ async def update_comments(
 
 @app.delete("/comments/{comments_id}/", tags=["Comments"])
 async def delete_comments(
-    comments_id: int,
-    database: Session = Depends(get_db),
+        comments_id: int,
+        database: Session = Depends(get_db),
 ):
     db_comments = (
         database.query(Comments)
@@ -697,26 +713,25 @@ async def delete_comments(
 #   LegalRequirement functions
 #
 ############################################
- 
- 
+
 
 @app.get("/legalrequirement/", response_model=None, tags=["LegalRequirement"])
 def get_all_legalrequirement(detailed: bool = False, database: Session = Depends(get_db)) -> list:
     from sqlalchemy.orm import joinedload
-    
+
     # Use detailed=true to get entities with eagerly loaded relationships (for tables with lookup columns)
     if detailed:
         # Eagerly load all relationships to avoid N+1 queries
         query = database.query(LegalRequirement)
         query = query.options(joinedload(LegalRequirement.project_1))
         legalrequirement_list = query.all()
-        
+
         # Serialize with relationships included
         result = []
         for legalrequirement_item in legalrequirement_list:
             item_dict = legalrequirement_item.__dict__.copy()
             item_dict.pop('_sa_instance_state', None)
-            
+
             # Add many-to-one relationships (foreign keys for lookup columns)
             if legalrequirement_item.project_1:
                 related_obj = legalrequirement_item.project_1
@@ -725,8 +740,7 @@ def get_all_legalrequirement(detailed: bool = False, database: Session = Depends
                 item_dict['project_1'] = related_dict
             else:
                 item_dict['project_1'] = None
-            
-            
+
             result.append(item_dict)
         return result
     else:
@@ -742,7 +756,8 @@ def get_count_legalrequirement(database: Session = Depends(get_db)) -> dict:
 
 
 @app.get("/legalrequirement/paginated/", response_model=None, tags=["LegalRequirement"])
-def get_paginated_legalrequirement(skip: int = 0, limit: int = 100, detailed: bool = False, database: Session = Depends(get_db)) -> dict:
+def get_paginated_legalrequirement(skip: int = 0, limit: int = 100, detailed: bool = False,
+                                   database: Session = Depends(get_db)) -> dict:
     """Get paginated list of LegalRequirement entities"""
     total = database.query(LegalRequirement).count()
     legalrequirement_list = database.query(LegalRequirement).offset(skip).limit(limit).all()
@@ -756,12 +771,11 @@ def get_paginated_legalrequirement(skip: int = 0, limit: int = 100, detailed: bo
 
 @app.get("/legalrequirement/search/", response_model=None, tags=["LegalRequirement"])
 def search_legalrequirement(
-    database: Session = Depends(get_db)
+        database: Session = Depends(get_db)
 ) -> list:
     """Search LegalRequirement entities by attributes"""
     query = database.query(LegalRequirement)
-    
-    
+
     results = query.all()
     return results
 
@@ -774,14 +788,13 @@ async def get_legalrequirement(legalrequirement_id: int, database: Session = Dep
 
     response_data = {
         "legalrequirement": db_legalrequirement,
-}
+    }
     return response_data
 
 
-
 @app.post("/legalrequirement/", response_model=None, tags=["LegalRequirement"])
-async def create_legalrequirement(legalrequirement_data: LegalRequirementCreate, database: Session = Depends(get_db)) -> LegalRequirement:
-
+async def create_legalrequirement(legalrequirement_data: LegalRequirementCreate,
+                                  database: Session = Depends(get_db)) -> LegalRequirement:
     if legalrequirement_data.project_1 is not None:
         db_project_1 = database.query(Project).filter(Project.id == legalrequirement_data.project_1).first()
         if not db_project_1:
@@ -790,44 +803,43 @@ async def create_legalrequirement(legalrequirement_data: LegalRequirementCreate,
         raise HTTPException(status_code=400, detail="Project ID is required")
 
     db_legalrequirement = LegalRequirement(
-        standard=legalrequirement_data.standard,        principle=legalrequirement_data.principle,        legal_ref=legalrequirement_data.legal_ref,
-        project_1_id=legalrequirement_data.project_1        )
+        standard=legalrequirement_data.standard, principle=legalrequirement_data.principle,
+        legal_ref=legalrequirement_data.legal_ref,
+        project_1_id=legalrequirement_data.project_1)
 
     database.add(db_legalrequirement)
     database.commit()
     database.refresh(db_legalrequirement)
 
-
-
-    
     return db_legalrequirement
 
 
 @app.post("/legalrequirement/bulk/", response_model=None, tags=["LegalRequirement"])
-async def bulk_create_legalrequirement(items: list[LegalRequirementCreate], database: Session = Depends(get_db)) -> dict:
+async def bulk_create_legalrequirement(items: list[LegalRequirementCreate],
+                                       database: Session = Depends(get_db)) -> dict:
     """Create multiple LegalRequirement entities at once"""
     created_items = []
     errors = []
-    
+
     for idx, item_data in enumerate(items):
         try:
             # Basic validation for each item
             if not item_data.project_1:
                 raise ValueError("Project ID is required")
-            
+
             db_legalrequirement = LegalRequirement(
-                standard=item_data.standard,                principle=item_data.principle,                legal_ref=item_data.legal_ref,
-                project_1_id=item_data.project_1            )
+                standard=item_data.standard, principle=item_data.principle, legal_ref=item_data.legal_ref,
+                project_1_id=item_data.project_1)
             database.add(db_legalrequirement)
             database.flush()  # Get ID without committing
             created_items.append(db_legalrequirement.id)
         except Exception as e:
             errors.append({"index": idx, "error": str(e)})
-    
+
     if errors:
         database.rollback()
         raise HTTPException(status_code=400, detail={"message": "Bulk creation failed", "errors": errors})
-    
+
     database.commit()
     return {
         "created_count": len(created_items),
@@ -841,7 +853,7 @@ async def bulk_delete_legalrequirement(ids: list[int], database: Session = Depen
     """Delete multiple LegalRequirement entities at once"""
     deleted_count = 0
     not_found = []
-    
+
     for item_id in ids:
         db_legalrequirement = database.query(LegalRequirement).filter(LegalRequirement.id == item_id).first()
         if db_legalrequirement:
@@ -849,17 +861,19 @@ async def bulk_delete_legalrequirement(ids: list[int], database: Session = Depen
             deleted_count += 1
         else:
             not_found.append(item_id)
-    
+
     database.commit()
-    
+
     return {
         "deleted_count": deleted_count,
         "not_found": not_found,
         "message": f"Successfully deleted {deleted_count} LegalRequirement entities"
     }
 
+
 @app.put("/legalrequirement/{legalrequirement_id}/", response_model=None, tags=["LegalRequirement"])
-async def update_legalrequirement(legalrequirement_id: int, legalrequirement_data: LegalRequirementCreate, database: Session = Depends(get_db)) -> LegalRequirement:
+async def update_legalrequirement(legalrequirement_id: int, legalrequirement_data: LegalRequirementCreate,
+                                  database: Session = Depends(get_db)) -> LegalRequirement:
     db_legalrequirement = database.query(LegalRequirement).filter(LegalRequirement.id == legalrequirement_id).first()
     if db_legalrequirement is None:
         raise HTTPException(status_code=404, detail="LegalRequirement not found")
@@ -874,7 +888,7 @@ async def update_legalrequirement(legalrequirement_id: int, legalrequirement_dat
         setattr(db_legalrequirement, 'project_1_id', legalrequirement_data.project_1)
     database.commit()
     database.refresh(db_legalrequirement)
-    
+
     return db_legalrequirement
 
 
@@ -888,35 +902,31 @@ async def delete_legalrequirement(legalrequirement_id: int, database: Session = 
     return db_legalrequirement
 
 
-
-
-
 ############################################
 #
 #   Tool functions
 #
 ############################################
- 
- 
+
 
 @app.get("/tool/", response_model=None, tags=["Tool"])
 def get_all_tool(detailed: bool = False, database: Session = Depends(get_db)) -> list:
     from sqlalchemy.orm import joinedload
-    
+
     # Use detailed=true to get entities with eagerly loaded relationships (for tables with lookup columns)
     if detailed:
         # Eagerly load all relationships to avoid N+1 queries
         query = database.query(Tool)
         tool_list = query.all()
-        
+
         # Serialize with relationships included
         result = []
         for tool_item in tool_list:
             item_dict = tool_item.__dict__.copy()
             item_dict.pop('_sa_instance_state', None)
-            
+
             # Add many-to-one relationships (foreign keys for lookup columns)
-            
+
             # Add many-to-many and one-to-many relationship objects (full details)
             observation_list = database.query(Observation).filter(Observation.tool_id == tool_item.id).all()
             item_dict['observation_1'] = []
@@ -924,7 +934,7 @@ def get_all_tool(detailed: bool = False, database: Session = Depends(get_db)) ->
                 observation_dict = observation_obj.__dict__.copy()
                 observation_dict.pop('_sa_instance_state', None)
                 item_dict['observation_1'].append(observation_dict)
-            
+
             result.append(item_dict)
         return result
     else:
@@ -940,7 +950,8 @@ def get_count_tool(database: Session = Depends(get_db)) -> dict:
 
 
 @app.get("/tool/paginated/", response_model=None, tags=["Tool"])
-def get_paginated_tool(skip: int = 0, limit: int = 100, detailed: bool = False, database: Session = Depends(get_db)) -> dict:
+def get_paginated_tool(skip: int = 0, limit: int = 100, detailed: bool = False,
+                       database: Session = Depends(get_db)) -> dict:
     """Get paginated list of Tool entities"""
     total = database.query(Tool).count()
     tool_list = database.query(Tool).offset(skip).limit(limit).all()
@@ -953,13 +964,13 @@ def get_paginated_tool(skip: int = 0, limit: int = 100, detailed: bool = False, 
             "limit": limit,
             "data": tool_list
         }
-    
+
     result = []
     for tool_item in tool_list:
         observation_1_ids = database.query(Observation.id).filter(Observation.tool_id == tool_item.id).all()
         item_data = {
             "tool": tool_item,
-            "observation_1_ids": [x[0] for x in observation_1_ids]        }
+            "observation_1_ids": [x[0] for x in observation_1_ids]}
         result.append(item_data)
     return {
         "total": total,
@@ -971,12 +982,11 @@ def get_paginated_tool(skip: int = 0, limit: int = 100, detailed: bool = False, 
 
 @app.get("/tool/search/", response_model=None, tags=["Tool"])
 def search_tool(
-    database: Session = Depends(get_db)
+        database: Session = Depends(get_db)
 ) -> list:
     """Search Tool entities by attributes"""
     query = database.query(Tool)
-    
-    
+
     results = query.all()
     return results
 
@@ -994,13 +1004,10 @@ async def get_tool(tool_id: int, database: Session = Depends(get_db)) -> Tool:
     return response_data
 
 
-
 @app.post("/tool/", response_model=None, tags=["Tool"])
 async def create_tool(tool_data: ToolCreate, database: Session = Depends(get_db)) -> Tool:
-
-
     db_tool = Tool(
-        source=tool_data.source,        version=tool_data.version,        licensing=tool_data.licensing.value,        name=tool_data.name        )
+        source=tool_data.source, version=tool_data.version, licensing=tool_data.licensing.value, name=tool_data.name)
 
     database.add(db_tool)
     database.commit()
@@ -1012,19 +1019,17 @@ async def create_tool(tool_data: ToolCreate, database: Session = Depends(get_db)
             db_observation = database.query(Observation).filter(Observation.id == observation_id).first()
             if not db_observation:
                 raise HTTPException(status_code=400, detail=f"Observation with id {observation_id} not found")
-        
+
         # Update the related entities with the new foreign key
         database.query(Observation).filter(Observation.id.in_(tool_data.observation_1)).update(
             {Observation.tool_id: db_tool.id}, synchronize_session=False
         )
         database.commit()
 
-
-    
     observation_1_ids = database.query(Observation.id).filter(Observation.tool_id == db_tool.id).all()
     response_data = {
         "tool": db_tool,
-        "observation_1_ids": [x[0] for x in observation_1_ids]    }
+        "observation_1_ids": [x[0] for x in observation_1_ids]}
     return response_data
 
 
@@ -1033,23 +1038,24 @@ async def bulk_create_tool(items: list[ToolCreate], database: Session = Depends(
     """Create multiple Tool entities at once"""
     created_items = []
     errors = []
-    
+
     for idx, item_data in enumerate(items):
         try:
             # Basic validation for each item
-            
+
             db_tool = Tool(
-                source=item_data.source,                version=item_data.version,                licensing=item_data.licensing.value,                name=item_data.name            )
+                source=item_data.source, version=item_data.version, licensing=item_data.licensing.value,
+                name=item_data.name)
             database.add(db_tool)
             database.flush()  # Get ID without committing
             created_items.append(db_tool.id)
         except Exception as e:
             errors.append({"index": idx, "error": str(e)})
-    
+
     if errors:
         database.rollback()
         raise HTTPException(status_code=400, detail={"message": "Bulk creation failed", "errors": errors})
-    
+
     database.commit()
     return {
         "created_count": len(created_items),
@@ -1063,7 +1069,7 @@ async def bulk_delete_tool(ids: list[int], database: Session = Depends(get_db)) 
     """Delete multiple Tool entities at once"""
     deleted_count = 0
     not_found = []
-    
+
     for item_id in ids:
         db_tool = database.query(Tool).filter(Tool.id == item_id).first()
         if db_tool:
@@ -1071,14 +1077,15 @@ async def bulk_delete_tool(ids: list[int], database: Session = Depends(get_db)) 
             deleted_count += 1
         else:
             not_found.append(item_id)
-    
+
     database.commit()
-    
+
     return {
         "deleted_count": deleted_count,
         "not_found": not_found,
         "message": f"Successfully deleted {deleted_count} Tool entities"
     }
+
 
 @app.put("/tool/{tool_id}/", response_model=None, tags=["Tool"])
 async def update_tool(tool_id: int, tool_data: ToolCreate, database: Session = Depends(get_db)) -> Tool:
@@ -1095,7 +1102,7 @@ async def update_tool(tool_id: int, tool_data: ToolCreate, database: Session = D
         database.query(Observation).filter(Observation.tool_id == db_tool.id).update(
             {Observation.tool_id: None}, synchronize_session=False
         )
-        
+
         # Set new relationships if list is not empty
         if tool_data.observation_1:
             # Validate that all IDs exist
@@ -1103,18 +1110,18 @@ async def update_tool(tool_id: int, tool_data: ToolCreate, database: Session = D
                 db_observation = database.query(Observation).filter(Observation.id == observation_id).first()
                 if not db_observation:
                     raise HTTPException(status_code=400, detail=f"Observation with id {observation_id} not found")
-            
+
             # Update the related entities with the new foreign key
             database.query(Observation).filter(Observation.id.in_(tool_data.observation_1)).update(
                 {Observation.tool_id: db_tool.id}, synchronize_session=False
             )
     database.commit()
     database.refresh(db_tool)
-    
+
     observation_1_ids = database.query(Observation.id).filter(Observation.tool_id == db_tool.id).all()
     response_data = {
         "tool": db_tool,
-        "observation_1_ids": [x[0] for x in observation_1_ids]    }
+        "observation_1_ids": [x[0] for x in observation_1_ids]}
     return response_data
 
 
@@ -1128,7 +1135,6 @@ async def delete_tool(tool_id: int, database: Session = Depends(get_db)):
     return db_tool
 
 
-
 ############################################
 #   Tool Method Endpoints
 ############################################
@@ -1136,9 +1142,9 @@ async def delete_tool(tool_id: int, database: Session = Depends(get_db)):
 
 @app.post("/tool/{tool_id}/methods/new_method/", response_model=None, tags=["Tool Methods"])
 async def execute_tool_new_method(
-    tool_id: int,
-    params: dict = Body(default=None, embed=True),
-    database: Session = Depends(get_db)
+        tool_id: int,
+        params: dict = Body(default=None, embed=True),
+        database: Session = Depends(get_db)
 ):
     """
     Execute the new_method method on a Tool instance.
@@ -1147,11 +1153,11 @@ async def execute_tool_new_method(
     _tool_object = database.query(Tool).filter(Tool.id == tool_id).first()
     if _tool_object is None:
         raise HTTPException(status_code=404, detail="Tool not found")
-    
+
     # Prepare method parameters
 
     # Execute the method
-    try:        
+    try:
         # Capture stdout to include print outputs in the response
         import io
         import sys
@@ -1169,10 +1175,10 @@ async def execute_tool_new_method(
         # Restore stdout
         sys.stdout = sys.__stdout__
         output = captured_output.getvalue()
-        
+
         # Determine result (last statement or None)
         result = None
-        
+
         return {
             "tool_id": tool_id,
             "method": "new_method",
@@ -1185,37 +1191,31 @@ async def execute_tool_new_method(
         raise HTTPException(status_code=500, detail=f"Method execution failed: {str(e)}")
 
 
-
 ############################################
 #
 #   Datashape functions
 #
 ############################################
- 
- 
- 
- 
- 
- 
+
 
 @app.get("/datashape/", response_model=None, tags=["Datashape"])
 def get_all_datashape(detailed: bool = False, database: Session = Depends(get_db)) -> list:
     from sqlalchemy.orm import joinedload
-    
+
     # Use detailed=true to get entities with eagerly loaded relationships (for tables with lookup columns)
     if detailed:
         # Eagerly load all relationships to avoid N+1 queries
         query = database.query(Datashape)
         datashape_list = query.all()
-        
+
         # Serialize with relationships included
         result = []
         for datashape_item in datashape_list:
             item_dict = datashape_item.__dict__.copy()
             item_dict.pop('_sa_instance_state', None)
-            
+
             # Add many-to-one relationships (foreign keys for lookup columns)
-            
+
             # Add many-to-many and one-to-many relationship objects (full details)
             feature_list = database.query(Feature).filter(Feature.date_id == datashape_item.id).all()
             item_dict['f_date'] = []
@@ -1235,7 +1235,7 @@ def get_all_datashape(detailed: bool = False, database: Session = Depends(get_db
                 feature_dict = feature_obj.__dict__.copy()
                 feature_dict.pop('_sa_instance_state', None)
                 item_dict['f_features'].append(feature_dict)
-            
+
             result.append(item_dict)
         return result
     else:
@@ -1251,7 +1251,8 @@ def get_count_datashape(database: Session = Depends(get_db)) -> dict:
 
 
 @app.get("/datashape/paginated/", response_model=None, tags=["Datashape"])
-def get_paginated_datashape(skip: int = 0, limit: int = 100, detailed: bool = False, database: Session = Depends(get_db)) -> dict:
+def get_paginated_datashape(skip: int = 0, limit: int = 100, detailed: bool = False,
+                            database: Session = Depends(get_db)) -> dict:
     """Get paginated list of Datashape entities"""
     total = database.query(Datashape).count()
     datashape_list = database.query(Datashape).offset(skip).limit(limit).all()
@@ -1264,7 +1265,7 @@ def get_paginated_datashape(skip: int = 0, limit: int = 100, detailed: bool = Fa
             "limit": limit,
             "data": datashape_list
         }
-    
+
     result = []
     for datashape_item in datashape_list:
         f_date_ids = database.query(Feature.id).filter(Feature.date_id == datashape_item.id).all()
@@ -1272,7 +1273,8 @@ def get_paginated_datashape(skip: int = 0, limit: int = 100, detailed: bool = Fa
         f_features_ids = database.query(Feature.id).filter(Feature.features_id == datashape_item.id).all()
         item_data = {
             "datashape": datashape_item,
-            "f_date_ids": [x[0] for x in f_date_ids],            "dataset_1_ids": [x[0] for x in dataset_1_ids],            "f_features_ids": [x[0] for x in f_features_ids]        }
+            "f_date_ids": [x[0] for x in f_date_ids], "dataset_1_ids": [x[0] for x in dataset_1_ids],
+            "f_features_ids": [x[0] for x in f_features_ids]}
         result.append(item_data)
     return {
         "total": total,
@@ -1284,12 +1286,11 @@ def get_paginated_datashape(skip: int = 0, limit: int = 100, detailed: bool = Fa
 
 @app.get("/datashape/search/", response_model=None, tags=["Datashape"])
 def search_datashape(
-    database: Session = Depends(get_db)
+        database: Session = Depends(get_db)
 ) -> list:
     """Search Datashape entities by attributes"""
     query = database.query(Datashape)
-    
-    
+
     results = query.all()
     return results
 
@@ -1305,17 +1306,15 @@ async def get_datashape(datashape_id: int, database: Session = Depends(get_db)) 
     f_features_ids = database.query(Feature.id).filter(Feature.features_id == db_datashape.id).all()
     response_data = {
         "datashape": db_datashape,
-        "f_date_ids": [x[0] for x in f_date_ids],        "dataset_1_ids": [x[0] for x in dataset_1_ids],        "f_features_ids": [x[0] for x in f_features_ids]}
+        "f_date_ids": [x[0] for x in f_date_ids], "dataset_1_ids": [x[0] for x in dataset_1_ids],
+        "f_features_ids": [x[0] for x in f_features_ids]}
     return response_data
-
 
 
 @app.post("/datashape/", response_model=None, tags=["Datashape"])
 async def create_datashape(datashape_data: DatashapeCreate, database: Session = Depends(get_db)) -> Datashape:
-
-
     db_datashape = Datashape(
-        accepted_target_values=datashape_data.accepted_target_values        )
+        accepted_target_values=datashape_data.accepted_target_values)
 
     database.add(db_datashape)
     database.commit()
@@ -1327,7 +1326,7 @@ async def create_datashape(datashape_data: DatashapeCreate, database: Session = 
             db_feature = database.query(Feature).filter(Feature.id == feature_id).first()
             if not db_feature:
                 raise HTTPException(status_code=400, detail=f"Feature with id {feature_id} not found")
-        
+
         # Update the related entities with the new foreign key
         database.query(Feature).filter(Feature.id.in_(datashape_data.f_date)).update(
             {Feature.date_id: db_datashape.id}, synchronize_session=False
@@ -1339,7 +1338,7 @@ async def create_datashape(datashape_data: DatashapeCreate, database: Session = 
             db_dataset = database.query(Dataset).filter(Dataset.id == dataset_id).first()
             if not db_dataset:
                 raise HTTPException(status_code=400, detail=f"Dataset with id {dataset_id} not found")
-        
+
         # Update the related entities with the new foreign key
         database.query(Dataset).filter(Dataset.id.in_(datashape_data.dataset_1)).update(
             {Dataset.datashape_id: db_datashape.id}, synchronize_session=False
@@ -1351,21 +1350,20 @@ async def create_datashape(datashape_data: DatashapeCreate, database: Session = 
             db_feature = database.query(Feature).filter(Feature.id == feature_id).first()
             if not db_feature:
                 raise HTTPException(status_code=400, detail=f"Feature with id {feature_id} not found")
-        
+
         # Update the related entities with the new foreign key
         database.query(Feature).filter(Feature.id.in_(datashape_data.f_features)).update(
             {Feature.features_id: db_datashape.id}, synchronize_session=False
         )
         database.commit()
 
-
-    
     f_date_ids = database.query(Feature.id).filter(Feature.date_id == db_datashape.id).all()
     dataset_1_ids = database.query(Dataset.id).filter(Dataset.datashape_id == db_datashape.id).all()
     f_features_ids = database.query(Feature.id).filter(Feature.features_id == db_datashape.id).all()
     response_data = {
         "datashape": db_datashape,
-        "f_date_ids": [x[0] for x in f_date_ids],        "dataset_1_ids": [x[0] for x in dataset_1_ids],        "f_features_ids": [x[0] for x in f_features_ids]    }
+        "f_date_ids": [x[0] for x in f_date_ids], "dataset_1_ids": [x[0] for x in dataset_1_ids],
+        "f_features_ids": [x[0] for x in f_features_ids]}
     return response_data
 
 
@@ -1374,23 +1372,23 @@ async def bulk_create_datashape(items: list[DatashapeCreate], database: Session 
     """Create multiple Datashape entities at once"""
     created_items = []
     errors = []
-    
+
     for idx, item_data in enumerate(items):
         try:
             # Basic validation for each item
-            
+
             db_datashape = Datashape(
-                accepted_target_values=item_data.accepted_target_values            )
+                accepted_target_values=item_data.accepted_target_values)
             database.add(db_datashape)
             database.flush()  # Get ID without committing
             created_items.append(db_datashape.id)
         except Exception as e:
             errors.append({"index": idx, "error": str(e)})
-    
+
     if errors:
         database.rollback()
         raise HTTPException(status_code=400, detail={"message": "Bulk creation failed", "errors": errors})
-    
+
     database.commit()
     return {
         "created_count": len(created_items),
@@ -1404,7 +1402,7 @@ async def bulk_delete_datashape(ids: list[int], database: Session = Depends(get_
     """Delete multiple Datashape entities at once"""
     deleted_count = 0
     not_found = []
-    
+
     for item_id in ids:
         db_datashape = database.query(Datashape).filter(Datashape.id == item_id).first()
         if db_datashape:
@@ -1412,17 +1410,19 @@ async def bulk_delete_datashape(ids: list[int], database: Session = Depends(get_
             deleted_count += 1
         else:
             not_found.append(item_id)
-    
+
     database.commit()
-    
+
     return {
         "deleted_count": deleted_count,
         "not_found": not_found,
         "message": f"Successfully deleted {deleted_count} Datashape entities"
     }
 
+
 @app.put("/datashape/{datashape_id}/", response_model=None, tags=["Datashape"])
-async def update_datashape(datashape_id: int, datashape_data: DatashapeCreate, database: Session = Depends(get_db)) -> Datashape:
+async def update_datashape(datashape_id: int, datashape_data: DatashapeCreate,
+                           database: Session = Depends(get_db)) -> Datashape:
     db_datashape = database.query(Datashape).filter(Datashape.id == datashape_id).first()
     if db_datashape is None:
         raise HTTPException(status_code=404, detail="Datashape not found")
@@ -1433,7 +1433,7 @@ async def update_datashape(datashape_id: int, datashape_data: DatashapeCreate, d
         database.query(Feature).filter(Feature.date_id == db_datashape.id).update(
             {Feature.date_id: None}, synchronize_session=False
         )
-        
+
         # Set new relationships if list is not empty
         if datashape_data.f_date:
             # Validate that all IDs exist
@@ -1441,7 +1441,7 @@ async def update_datashape(datashape_id: int, datashape_data: DatashapeCreate, d
                 db_feature = database.query(Feature).filter(Feature.id == feature_id).first()
                 if not db_feature:
                     raise HTTPException(status_code=400, detail=f"Feature with id {feature_id} not found")
-            
+
             # Update the related entities with the new foreign key
             database.query(Feature).filter(Feature.id.in_(datashape_data.f_date)).update(
                 {Feature.date_id: db_datashape.id}, synchronize_session=False
@@ -1451,7 +1451,7 @@ async def update_datashape(datashape_id: int, datashape_data: DatashapeCreate, d
         database.query(Dataset).filter(Dataset.datashape_id == db_datashape.id).update(
             {Dataset.datashape_id: None}, synchronize_session=False
         )
-        
+
         # Set new relationships if list is not empty
         if datashape_data.dataset_1:
             # Validate that all IDs exist
@@ -1459,7 +1459,7 @@ async def update_datashape(datashape_id: int, datashape_data: DatashapeCreate, d
                 db_dataset = database.query(Dataset).filter(Dataset.id == dataset_id).first()
                 if not db_dataset:
                     raise HTTPException(status_code=400, detail=f"Dataset with id {dataset_id} not found")
-            
+
             # Update the related entities with the new foreign key
             database.query(Dataset).filter(Dataset.id.in_(datashape_data.dataset_1)).update(
                 {Dataset.datashape_id: db_datashape.id}, synchronize_session=False
@@ -1469,7 +1469,7 @@ async def update_datashape(datashape_id: int, datashape_data: DatashapeCreate, d
         database.query(Feature).filter(Feature.features_id == db_datashape.id).update(
             {Feature.features_id: None}, synchronize_session=False
         )
-        
+
         # Set new relationships if list is not empty
         if datashape_data.f_features:
             # Validate that all IDs exist
@@ -1477,20 +1477,21 @@ async def update_datashape(datashape_id: int, datashape_data: DatashapeCreate, d
                 db_feature = database.query(Feature).filter(Feature.id == feature_id).first()
                 if not db_feature:
                     raise HTTPException(status_code=400, detail=f"Feature with id {feature_id} not found")
-            
+
             # Update the related entities with the new foreign key
             database.query(Feature).filter(Feature.id.in_(datashape_data.f_features)).update(
                 {Feature.features_id: db_datashape.id}, synchronize_session=False
             )
     database.commit()
     database.refresh(db_datashape)
-    
+
     f_date_ids = database.query(Feature.id).filter(Feature.date_id == db_datashape.id).all()
     dataset_1_ids = database.query(Dataset.id).filter(Dataset.datashape_id == db_datashape.id).all()
     f_features_ids = database.query(Feature.id).filter(Feature.features_id == db_datashape.id).all()
     response_data = {
         "datashape": db_datashape,
-        "f_date_ids": [x[0] for x in f_date_ids],        "dataset_1_ids": [x[0] for x in dataset_1_ids],        "f_features_ids": [x[0] for x in f_features_ids]    }
+        "f_date_ids": [x[0] for x in f_date_ids], "dataset_1_ids": [x[0] for x in dataset_1_ids],
+        "f_features_ids": [x[0] for x in f_features_ids]}
     return response_data
 
 
@@ -1504,39 +1505,31 @@ async def delete_datashape(datashape_id: int, database: Session = Depends(get_db
     return db_datashape
 
 
-
-
-
 ############################################
 #
 #   Project functions
 #
 ############################################
- 
- 
- 
- 
- 
- 
+
 
 @app.get("/project/", response_model=None, tags=["Project"])
 def get_all_project(detailed: bool = False, database: Session = Depends(get_db)) -> list:
     from sqlalchemy.orm import joinedload
-    
+
     # Use detailed=true to get entities with eagerly loaded relationships (for tables with lookup columns)
     if detailed:
         # Eagerly load all relationships to avoid N+1 queries
         query = database.query(Project)
         project_list = query.all()
-        
+
         # Serialize with relationships included
         result = []
         for project_item in project_list:
             item_dict = project_item.__dict__.copy()
             item_dict.pop('_sa_instance_state', None)
-            
+
             # Add many-to-one relationships (foreign keys for lookup columns)
-            
+
             # Add many-to-many and one-to-many relationship objects (full details)
             element_list = database.query(Element).filter(Element.project_id == project_item.id).all()
             item_dict['involves'] = []
@@ -1550,13 +1543,14 @@ def get_all_project(detailed: bool = False, database: Session = Depends(get_db))
                 evaluation_dict = evaluation_obj.__dict__.copy()
                 evaluation_dict.pop('_sa_instance_state', None)
                 item_dict['eval'].append(evaluation_dict)
-            legalrequirement_list = database.query(LegalRequirement).filter(LegalRequirement.project_1_id == project_item.id).all()
+            legalrequirement_list = database.query(LegalRequirement).filter(
+                LegalRequirement.project_1_id == project_item.id).all()
             item_dict['legal_requirements'] = []
             for legalrequirement_obj in legalrequirement_list:
                 legalrequirement_dict = legalrequirement_obj.__dict__.copy()
                 legalrequirement_dict.pop('_sa_instance_state', None)
                 item_dict['legal_requirements'].append(legalrequirement_dict)
-            
+
             result.append(item_dict)
         return result
     else:
@@ -1572,7 +1566,8 @@ def get_count_project(database: Session = Depends(get_db)) -> dict:
 
 
 @app.get("/project/paginated/", response_model=None, tags=["Project"])
-def get_paginated_project(skip: int = 0, limit: int = 100, detailed: bool = False, database: Session = Depends(get_db)) -> dict:
+def get_paginated_project(skip: int = 0, limit: int = 100, detailed: bool = False,
+                          database: Session = Depends(get_db)) -> dict:
     """Get paginated list of Project entities"""
     total = database.query(Project).count()
     project_list = database.query(Project).offset(skip).limit(limit).all()
@@ -1585,15 +1580,17 @@ def get_paginated_project(skip: int = 0, limit: int = 100, detailed: bool = Fals
             "limit": limit,
             "data": project_list
         }
-    
+
     result = []
     for project_item in project_list:
         involves_ids = database.query(Element.id).filter(Element.project_id == project_item.id).all()
         eval_ids = database.query(Evaluation.id).filter(Evaluation.project_id == project_item.id).all()
-        legal_requirements_ids = database.query(LegalRequirement.id).filter(LegalRequirement.project_1_id == project_item.id).all()
+        legal_requirements_ids = database.query(LegalRequirement.id).filter(
+            LegalRequirement.project_1_id == project_item.id).all()
         item_data = {
             "project": project_item,
-            "involves_ids": [x[0] for x in involves_ids],            "eval_ids": [x[0] for x in eval_ids],            "legal_requirements_ids": [x[0] for x in legal_requirements_ids]        }
+            "involves_ids": [x[0] for x in involves_ids], "eval_ids": [x[0] for x in eval_ids],
+            "legal_requirements_ids": [x[0] for x in legal_requirements_ids]}
         result.append(item_data)
     return {
         "total": total,
@@ -1605,12 +1602,11 @@ def get_paginated_project(skip: int = 0, limit: int = 100, detailed: bool = Fals
 
 @app.get("/project/search/", response_model=None, tags=["Project"])
 def search_project(
-    database: Session = Depends(get_db)
+        database: Session = Depends(get_db)
 ) -> list:
     """Search Project entities by attributes"""
     query = database.query(Project)
-    
-    
+
     results = query.all()
     return results
 
@@ -1623,20 +1619,19 @@ async def get_project(project_id: int, database: Session = Depends(get_db)) -> P
 
     involves_ids = database.query(Element.id).filter(Element.project_id == db_project.id).all()
     eval_ids = database.query(Evaluation.id).filter(Evaluation.project_id == db_project.id).all()
-    legal_requirements_ids = database.query(LegalRequirement.id).filter(LegalRequirement.project_1_id == db_project.id).all()
+    legal_requirements_ids = database.query(LegalRequirement.id).filter(
+        LegalRequirement.project_1_id == db_project.id).all()
     response_data = {
         "project": db_project,
-        "involves_ids": [x[0] for x in involves_ids],        "eval_ids": [x[0] for x in eval_ids],        "legal_requirements_ids": [x[0] for x in legal_requirements_ids]}
+        "involves_ids": [x[0] for x in involves_ids], "eval_ids": [x[0] for x in eval_ids],
+        "legal_requirements_ids": [x[0] for x in legal_requirements_ids]}
     return response_data
-
 
 
 @app.post("/project/", response_model=None, tags=["Project"])
 async def create_project(project_data: ProjectCreate, database: Session = Depends(get_db)) -> Project:
-
-
     db_project = Project(
-        status=project_data.status.value,        name=project_data.name        )
+        status=project_data.status.value, name=project_data.name)
 
     database.add(db_project)
     database.commit()
@@ -1648,7 +1643,7 @@ async def create_project(project_data: ProjectCreate, database: Session = Depend
             db_element = database.query(Element).filter(Element.id == element_id).first()
             if not db_element:
                 raise HTTPException(status_code=400, detail=f"Element with id {element_id} not found")
-        
+
         # Update the related entities with the new foreign key
         database.query(Element).filter(Element.id.in_(project_data.involves)).update(
             {Element.project_id: db_project.id}, synchronize_session=False
@@ -1660,7 +1655,7 @@ async def create_project(project_data: ProjectCreate, database: Session = Depend
             db_evaluation = database.query(Evaluation).filter(Evaluation.id == evaluation_id).first()
             if not db_evaluation:
                 raise HTTPException(status_code=400, detail=f"Evaluation with id {evaluation_id} not found")
-        
+
         # Update the related entities with the new foreign key
         database.query(Evaluation).filter(Evaluation.id.in_(project_data.eval)).update(
             {Evaluation.project_id: db_project.id}, synchronize_session=False
@@ -1669,24 +1664,25 @@ async def create_project(project_data: ProjectCreate, database: Session = Depend
     if project_data.legal_requirements:
         # Validate that all LegalRequirement IDs exist
         for legalrequirement_id in project_data.legal_requirements:
-            db_legalrequirement = database.query(LegalRequirement).filter(LegalRequirement.id == legalrequirement_id).first()
+            db_legalrequirement = database.query(LegalRequirement).filter(
+                LegalRequirement.id == legalrequirement_id).first()
             if not db_legalrequirement:
                 raise HTTPException(status_code=400, detail=f"LegalRequirement with id {legalrequirement_id} not found")
-        
+
         # Update the related entities with the new foreign key
         database.query(LegalRequirement).filter(LegalRequirement.id.in_(project_data.legal_requirements)).update(
             {LegalRequirement.project_1_id: db_project.id}, synchronize_session=False
         )
         database.commit()
 
-
-    
     involves_ids = database.query(Element.id).filter(Element.project_id == db_project.id).all()
     eval_ids = database.query(Evaluation.id).filter(Evaluation.project_id == db_project.id).all()
-    legal_requirements_ids = database.query(LegalRequirement.id).filter(LegalRequirement.project_1_id == db_project.id).all()
+    legal_requirements_ids = database.query(LegalRequirement.id).filter(
+        LegalRequirement.project_1_id == db_project.id).all()
     response_data = {
         "project": db_project,
-        "involves_ids": [x[0] for x in involves_ids],        "eval_ids": [x[0] for x in eval_ids],        "legal_requirements_ids": [x[0] for x in legal_requirements_ids]    }
+        "involves_ids": [x[0] for x in involves_ids], "eval_ids": [x[0] for x in eval_ids],
+        "legal_requirements_ids": [x[0] for x in legal_requirements_ids]}
     return response_data
 
 
@@ -1695,23 +1691,23 @@ async def bulk_create_project(items: list[ProjectCreate], database: Session = De
     """Create multiple Project entities at once"""
     created_items = []
     errors = []
-    
+
     for idx, item_data in enumerate(items):
         try:
             # Basic validation for each item
-            
+
             db_project = Project(
-                status=item_data.status.value,                name=item_data.name            )
+                status=item_data.status.value, name=item_data.name)
             database.add(db_project)
             database.flush()  # Get ID without committing
             created_items.append(db_project.id)
         except Exception as e:
             errors.append({"index": idx, "error": str(e)})
-    
+
     if errors:
         database.rollback()
         raise HTTPException(status_code=400, detail={"message": "Bulk creation failed", "errors": errors})
-    
+
     database.commit()
     return {
         "created_count": len(created_items),
@@ -1725,7 +1721,7 @@ async def bulk_delete_project(ids: list[int], database: Session = Depends(get_db
     """Delete multiple Project entities at once"""
     deleted_count = 0
     not_found = []
-    
+
     for item_id in ids:
         db_project = database.query(Project).filter(Project.id == item_id).first()
         if db_project:
@@ -1733,14 +1729,15 @@ async def bulk_delete_project(ids: list[int], database: Session = Depends(get_db
             deleted_count += 1
         else:
             not_found.append(item_id)
-    
+
     database.commit()
-    
+
     return {
         "deleted_count": deleted_count,
         "not_found": not_found,
         "message": f"Successfully deleted {deleted_count} Project entities"
     }
+
 
 @app.put("/project/{project_id}/", response_model=None, tags=["Project"])
 async def update_project(project_id: int, project_data: ProjectCreate, database: Session = Depends(get_db)) -> Project:
@@ -1755,7 +1752,7 @@ async def update_project(project_id: int, project_data: ProjectCreate, database:
         database.query(Element).filter(Element.project_id == db_project.id).update(
             {Element.project_id: None}, synchronize_session=False
         )
-        
+
         # Set new relationships if list is not empty
         if project_data.involves:
             # Validate that all IDs exist
@@ -1763,7 +1760,7 @@ async def update_project(project_id: int, project_data: ProjectCreate, database:
                 db_element = database.query(Element).filter(Element.id == element_id).first()
                 if not db_element:
                     raise HTTPException(status_code=400, detail=f"Element with id {element_id} not found")
-            
+
             # Update the related entities with the new foreign key
             database.query(Element).filter(Element.id.in_(project_data.involves)).update(
                 {Element.project_id: db_project.id}, synchronize_session=False
@@ -1773,7 +1770,7 @@ async def update_project(project_id: int, project_data: ProjectCreate, database:
         database.query(Evaluation).filter(Evaluation.project_id == db_project.id).update(
             {Evaluation.project_id: None}, synchronize_session=False
         )
-        
+
         # Set new relationships if list is not empty
         if project_data.eval:
             # Validate that all IDs exist
@@ -1781,7 +1778,7 @@ async def update_project(project_id: int, project_data: ProjectCreate, database:
                 db_evaluation = database.query(Evaluation).filter(Evaluation.id == evaluation_id).first()
                 if not db_evaluation:
                     raise HTTPException(status_code=400, detail=f"Evaluation with id {evaluation_id} not found")
-            
+
             # Update the related entities with the new foreign key
             database.query(Evaluation).filter(Evaluation.id.in_(project_data.eval)).update(
                 {Evaluation.project_id: db_project.id}, synchronize_session=False
@@ -1791,28 +1788,32 @@ async def update_project(project_id: int, project_data: ProjectCreate, database:
         database.query(LegalRequirement).filter(LegalRequirement.project_1_id == db_project.id).update(
             {LegalRequirement.project_1_id: None}, synchronize_session=False
         )
-        
+
         # Set new relationships if list is not empty
         if project_data.legal_requirements:
             # Validate that all IDs exist
             for legalrequirement_id in project_data.legal_requirements:
-                db_legalrequirement = database.query(LegalRequirement).filter(LegalRequirement.id == legalrequirement_id).first()
+                db_legalrequirement = database.query(LegalRequirement).filter(
+                    LegalRequirement.id == legalrequirement_id).first()
                 if not db_legalrequirement:
-                    raise HTTPException(status_code=400, detail=f"LegalRequirement with id {legalrequirement_id} not found")
-            
+                    raise HTTPException(status_code=400,
+                                        detail=f"LegalRequirement with id {legalrequirement_id} not found")
+
             # Update the related entities with the new foreign key
             database.query(LegalRequirement).filter(LegalRequirement.id.in_(project_data.legal_requirements)).update(
                 {LegalRequirement.project_1_id: db_project.id}, synchronize_session=False
             )
     database.commit()
     database.refresh(db_project)
-    
+
     involves_ids = database.query(Element.id).filter(Element.project_id == db_project.id).all()
     eval_ids = database.query(Evaluation.id).filter(Evaluation.project_id == db_project.id).all()
-    legal_requirements_ids = database.query(LegalRequirement.id).filter(LegalRequirement.project_1_id == db_project.id).all()
+    legal_requirements_ids = database.query(LegalRequirement.id).filter(
+        LegalRequirement.project_1_id == db_project.id).all()
     response_data = {
         "project": db_project,
-        "involves_ids": [x[0] for x in involves_ids],        "eval_ids": [x[0] for x in eval_ids],        "legal_requirements_ids": [x[0] for x in legal_requirements_ids]    }
+        "involves_ids": [x[0] for x in involves_ids], "eval_ids": [x[0] for x in eval_ids],
+        "legal_requirements_ids": [x[0] for x in legal_requirements_ids]}
     return response_data
 
 
@@ -1826,29 +1827,17 @@ async def delete_project(project_id: int, database: Session = Depends(get_db)):
     return db_project
 
 
-
-
-
 ############################################
 #
 #   Evaluation functions
 #
 ############################################
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
+
 
 @app.get("/evaluation/", response_model=None, tags=["Evaluation"])
 def get_all_evaluation(detailed: bool = False, database: Session = Depends(get_db)) -> list:
     from sqlalchemy.orm import joinedload
-    
+
     # Use detailed=true to get entities with eagerly loaded relationships (for tables with lookup columns)
     if detailed:
         # Eagerly load all relationships to avoid N+1 queries
@@ -1856,13 +1845,13 @@ def get_all_evaluation(detailed: bool = False, database: Session = Depends(get_d
         query = query.options(joinedload(Evaluation.config))
         query = query.options(joinedload(Evaluation.project))
         evaluation_list = query.all()
-        
+
         # Serialize with relationships included
         result = []
         for evaluation_item in evaluation_list:
             item_dict = evaluation_item.__dict__.copy()
             item_dict.pop('_sa_instance_state', None)
-            
+
             # Add many-to-one relationships (foreign keys for lookup columns)
             if evaluation_item.config:
                 related_obj = evaluation_item.config
@@ -1878,15 +1867,19 @@ def get_all_evaluation(detailed: bool = False, database: Session = Depends(get_d
                 item_dict['project'] = related_dict
             else:
                 item_dict['project'] = None
-            
+
             # Add many-to-many and one-to-many relationship objects (full details)
-            element_list = database.query(Element).join(evaluates_eval, Element.id == evaluates_eval.c.evaluates).filter(evaluates_eval.c.evalu == evaluation_item.id).all()
+            element_list = database.query(Element).join(evaluates_eval,
+                                                        Element.id == evaluates_eval.c.evaluates).filter(
+                evaluates_eval.c.evalu == evaluation_item.id).all()
             item_dict['evaluates'] = []
             for element_obj in element_list:
                 element_dict = element_obj.__dict__.copy()
                 element_dict.pop('_sa_instance_state', None)
                 item_dict['evaluates'].append(element_dict)
-            element_list = database.query(Element).join(evaluation_element, Element.id == evaluation_element.c.ref).filter(evaluation_element.c.eval == evaluation_item.id).all()
+            element_list = database.query(Element).join(evaluation_element,
+                                                        Element.id == evaluation_element.c.ref).filter(
+                evaluation_element.c.eval == evaluation_item.id).all()
             item_dict['ref'] = []
             for element_obj in element_list:
                 element_dict = element_obj.__dict__.copy()
@@ -1898,7 +1891,7 @@ def get_all_evaluation(detailed: bool = False, database: Session = Depends(get_d
                 observation_dict = observation_obj.__dict__.copy()
                 observation_dict.pop('_sa_instance_state', None)
                 item_dict['observations'].append(observation_dict)
-            
+
             result.append(item_dict)
         return result
     else:
@@ -1914,7 +1907,8 @@ def get_count_evaluation(database: Session = Depends(get_db)) -> dict:
 
 
 @app.get("/evaluation/paginated/", response_model=None, tags=["Evaluation"])
-def get_paginated_evaluation(skip: int = 0, limit: int = 100, detailed: bool = False, database: Session = Depends(get_db)) -> dict:
+def get_paginated_evaluation(skip: int = 0, limit: int = 100, detailed: bool = False,
+                             database: Session = Depends(get_db)) -> dict:
     """Get paginated list of Evaluation entities"""
     total = database.query(Evaluation).count()
     evaluation_list = database.query(Evaluation).offset(skip).limit(limit).all()
@@ -1927,17 +1921,19 @@ def get_paginated_evaluation(skip: int = 0, limit: int = 100, detailed: bool = F
             "limit": limit,
             "data": evaluation_list
         }
-    
+
     result = []
     for evaluation_item in evaluation_list:
-        element_ids = database.query(evaluates_eval.c.evaluates).filter(evaluates_eval.c.evalu == evaluation_item.id).all()
-        element_ids = database.query(evaluation_element.c.ref).filter(evaluation_element.c.eval == evaluation_item.id).all()
+        element_ids = database.query(evaluates_eval.c.evaluates).filter(
+            evaluates_eval.c.evalu == evaluation_item.id).all()
+        element_ids = database.query(evaluation_element.c.ref).filter(
+            evaluation_element.c.eval == evaluation_item.id).all()
         observations_ids = database.query(Observation.id).filter(Observation.eval_id == evaluation_item.id).all()
         item_data = {
             "evaluation": evaluation_item,
             "element_ids": [x[0] for x in element_ids],
             "element_ids": [x[0] for x in element_ids],
-            "observations_ids": [x[0] for x in observations_ids]        }
+            "observations_ids": [x[0] for x in observations_ids]}
         result.append(item_data)
     return {
         "total": total,
@@ -1949,12 +1945,11 @@ def get_paginated_evaluation(skip: int = 0, limit: int = 100, detailed: bool = F
 
 @app.get("/evaluation/search/", response_model=None, tags=["Evaluation"])
 def search_evaluation(
-    database: Session = Depends(get_db)
+        database: Session = Depends(get_db)
 ) -> list:
     """Search Evaluation entities by attributes"""
     query = database.query(Evaluation)
-    
-    
+
     results = query.all()
     return results
 
@@ -1976,10 +1971,8 @@ async def get_evaluation(evaluation_id: int, database: Session = Depends(get_db)
     return response_data
 
 
-
 @app.post("/evaluation/", response_model=None, tags=["Evaluation"])
 async def create_evaluation(evaluation_data: EvaluationCreate, database: Session = Depends(get_db)) -> Evaluation:
-
     if evaluation_data.config is not None:
         db_config = database.query(Configuration).filter(Configuration.id == evaluation_data.config).first()
         if not db_config:
@@ -2008,7 +2001,7 @@ async def create_evaluation(evaluation_data: EvaluationCreate, database: Session
                 raise HTTPException(status_code=404, detail=f"Element with ID {id} not found")
 
     db_evaluation = Evaluation(
-        status=evaluation_data.status.value,        config_id=evaluation_data.config,        project_id=evaluation_data.project        )
+        status=evaluation_data.status.value, config_id=evaluation_data.config, project_id=evaluation_data.project)
 
     database.add(db_evaluation)
     database.commit()
@@ -2020,7 +2013,7 @@ async def create_evaluation(evaluation_data: EvaluationCreate, database: Session
             db_observation = database.query(Observation).filter(Observation.id == observation_id).first()
             if not db_observation:
                 raise HTTPException(status_code=400, detail=f"Observation with id {observation_id} not found")
-        
+
         # Update the related entities with the new foreign key
         database.query(Observation).filter(Observation.id.in_(evaluation_data.observations)).update(
             {Observation.eval_id: db_evaluation.id}, synchronize_session=False
@@ -2044,7 +2037,6 @@ async def create_evaluation(evaluation_data: EvaluationCreate, database: Session
             database.execute(association)
             database.commit()
 
-    
     element_ids = database.query(evaluates_eval.c.evaluates).filter(evaluates_eval.c.evalu == db_evaluation.id).all()
     element_ids = database.query(evaluation_element.c.ref).filter(evaluation_element.c.eval == db_evaluation.id).all()
     observations_ids = database.query(Observation.id).filter(Observation.eval_id == db_evaluation.id).all()
@@ -2052,7 +2044,7 @@ async def create_evaluation(evaluation_data: EvaluationCreate, database: Session
         "evaluation": db_evaluation,
         "element_ids": [x[0] for x in element_ids],
         "element_ids": [x[0] for x in element_ids],
-        "observations_ids": [x[0] for x in observations_ids]    }
+        "observations_ids": [x[0] for x in observations_ids]}
     return response_data
 
 
@@ -2061,7 +2053,7 @@ async def bulk_create_evaluation(items: list[EvaluationCreate], database: Sessio
     """Create multiple Evaluation entities at once"""
     created_items = []
     errors = []
-    
+
     for idx, item_data in enumerate(items):
         try:
             # Basic validation for each item
@@ -2069,21 +2061,21 @@ async def bulk_create_evaluation(items: list[EvaluationCreate], database: Sessio
                 raise ValueError("Configuration ID is required")
             if not item_data.project:
                 raise ValueError("Project ID is required")
-            
+
             db_evaluation = Evaluation(
                 status=item_data.status.value,
                 config_id=item_data.config,
-                project_id=item_data.project            )
+                project_id=item_data.project)
             database.add(db_evaluation)
             database.flush()  # Get ID without committing
             created_items.append(db_evaluation.id)
         except Exception as e:
             errors.append({"index": idx, "error": str(e)})
-    
+
     if errors:
         database.rollback()
         raise HTTPException(status_code=400, detail={"message": "Bulk creation failed", "errors": errors})
-    
+
     database.commit()
     return {
         "created_count": len(created_items),
@@ -2097,7 +2089,7 @@ async def bulk_delete_evaluation(ids: list[int], database: Session = Depends(get
     """Delete multiple Evaluation entities at once"""
     deleted_count = 0
     not_found = []
-    
+
     for item_id in ids:
         db_evaluation = database.query(Evaluation).filter(Evaluation.id == item_id).first()
         if db_evaluation:
@@ -2105,17 +2097,19 @@ async def bulk_delete_evaluation(ids: list[int], database: Session = Depends(get
             deleted_count += 1
         else:
             not_found.append(item_id)
-    
+
     database.commit()
-    
+
     return {
         "deleted_count": deleted_count,
         "not_found": not_found,
         "message": f"Successfully deleted {deleted_count} Evaluation entities"
     }
 
+
 @app.put("/evaluation/{evaluation_id}/", response_model=None, tags=["Evaluation"])
-async def update_evaluation(evaluation_id: int, evaluation_data: EvaluationCreate, database: Session = Depends(get_db)) -> Evaluation:
+async def update_evaluation(evaluation_id: int, evaluation_data: EvaluationCreate,
+                            database: Session = Depends(get_db)) -> Evaluation:
     db_evaluation = database.query(Evaluation).filter(Evaluation.id == evaluation_id).first()
     if db_evaluation is None:
         raise HTTPException(status_code=404, detail="Evaluation not found")
@@ -2136,7 +2130,7 @@ async def update_evaluation(evaluation_id: int, evaluation_data: EvaluationCreat
         database.query(Observation).filter(Observation.eval_id == db_evaluation.id).update(
             {Observation.eval_id: None}, synchronize_session=False
         )
-        
+
         # Set new relationships if list is not empty
         if evaluation_data.observations:
             # Validate that all IDs exist
@@ -2144,14 +2138,14 @@ async def update_evaluation(evaluation_id: int, evaluation_data: EvaluationCreat
                 db_observation = database.query(Observation).filter(Observation.id == observation_id).first()
                 if not db_observation:
                     raise HTTPException(status_code=400, detail=f"Observation with id {observation_id} not found")
-            
+
             # Update the related entities with the new foreign key
             database.query(Observation).filter(Observation.id.in_(evaluation_data.observations)).update(
                 {Observation.eval_id: db_evaluation.id}, synchronize_session=False
             )
     existing_element_ids = [assoc.evaluates for assoc in database.execute(
         evaluates_eval.select().where(evaluates_eval.c.evalu == db_evaluation.id))]
-    
+
     elements_to_remove = set(existing_element_ids) - set(evaluation_data.evaluates)
     for element_id in elements_to_remove:
         association = evaluates_eval.delete().where(
@@ -2167,7 +2161,7 @@ async def update_evaluation(evaluation_id: int, evaluation_data: EvaluationCreat
         database.execute(association)
     existing_element_ids = [assoc.ref for assoc in database.execute(
         evaluation_element.select().where(evaluation_element.c.eval == db_evaluation.id))]
-    
+
     elements_to_remove = set(existing_element_ids) - set(evaluation_data.ref)
     for element_id in elements_to_remove:
         association = evaluation_element.delete().where(
@@ -2183,7 +2177,7 @@ async def update_evaluation(evaluation_id: int, evaluation_data: EvaluationCreat
         database.execute(association)
     database.commit()
     database.refresh(db_evaluation)
-    
+
     element_ids = database.query(evaluates_eval.c.evaluates).filter(evaluates_eval.c.evalu == db_evaluation.id).all()
     element_ids = database.query(evaluation_element.c.ref).filter(evaluation_element.c.eval == db_evaluation.id).all()
     observations_ids = database.query(Observation.id).filter(Observation.eval_id == db_evaluation.id).all()
@@ -2191,7 +2185,7 @@ async def update_evaluation(evaluation_id: int, evaluation_data: EvaluationCreat
         "evaluation": db_evaluation,
         "element_ids": [x[0] for x in element_ids],
         "element_ids": [x[0] for x in element_ids],
-        "observations_ids": [x[0] for x in observations_ids]    }
+        "observations_ids": [x[0] for x in observations_ids]}
     return response_data
 
 
@@ -2204,58 +2198,60 @@ async def delete_evaluation(evaluation_id: int, database: Session = Depends(get_
     database.commit()
     return db_evaluation
 
+
 @app.post("/evaluation/{evaluation_id}/evaluates/{element_id}/", response_model=None, tags=["Evaluation Relationships"])
 async def add_evaluates_to_evaluation(evaluation_id: int, element_id: int, database: Session = Depends(get_db)):
     """Add a Element to this Evaluation's evaluates relationship"""
     db_evaluation = database.query(Evaluation).filter(Evaluation.id == evaluation_id).first()
     if db_evaluation is None:
         raise HTTPException(status_code=404, detail="Evaluation not found")
-    
+
     db_element = database.query(Element).filter(Element.id == element_id).first()
     if db_element is None:
         raise HTTPException(status_code=404, detail="Element not found")
-    
+
     # Check if relationship already exists
     existing = database.query(evaluates_eval).filter(
-        (evaluates_eval.c.evalu == evaluation_id) & 
+        (evaluates_eval.c.evalu == evaluation_id) &
         (evaluates_eval.c.evaluates == element_id)
     ).first()
-    
+
     if existing:
         raise HTTPException(status_code=400, detail="Relationship already exists")
-    
+
     # Create the association
     association = evaluates_eval.insert().values(evalu=evaluation_id, evaluates=element_id)
     database.execute(association)
     database.commit()
-    
+
     return {"message": "Element added to evaluates successfully"}
 
 
-@app.delete("/evaluation/{evaluation_id}/evaluates/{element_id}/", response_model=None, tags=["Evaluation Relationships"])
+@app.delete("/evaluation/{evaluation_id}/evaluates/{element_id}/", response_model=None,
+            tags=["Evaluation Relationships"])
 async def remove_evaluates_from_evaluation(evaluation_id: int, element_id: int, database: Session = Depends(get_db)):
     """Remove a Element from this Evaluation's evaluates relationship"""
     db_evaluation = database.query(Evaluation).filter(Evaluation.id == evaluation_id).first()
     if db_evaluation is None:
         raise HTTPException(status_code=404, detail="Evaluation not found")
-    
+
     # Check if relationship exists
     existing = database.query(evaluates_eval).filter(
-        (evaluates_eval.c.evalu == evaluation_id) & 
+        (evaluates_eval.c.evalu == evaluation_id) &
         (evaluates_eval.c.evaluates == element_id)
     ).first()
-    
+
     if not existing:
         raise HTTPException(status_code=404, detail="Relationship not found")
-    
+
     # Delete the association
     association = evaluates_eval.delete().where(
-        (evaluates_eval.c.evalu == evaluation_id) & 
+        (evaluates_eval.c.evalu == evaluation_id) &
         (evaluates_eval.c.evaluates == element_id)
     )
     database.execute(association)
     database.commit()
-    
+
     return {"message": "Element removed from evaluates successfully"}
 
 
@@ -2265,15 +2261,16 @@ async def get_evaluates_of_evaluation(evaluation_id: int, database: Session = De
     db_evaluation = database.query(Evaluation).filter(Evaluation.id == evaluation_id).first()
     if db_evaluation is None:
         raise HTTPException(status_code=404, detail="Evaluation not found")
-    
+
     element_ids = database.query(evaluates_eval.c.evaluates).filter(evaluates_eval.c.evalu == evaluation_id).all()
     element_list = database.query(Element).filter(Element.id.in_([id[0] for id in element_ids])).all()
-    
+
     return {
         "evaluation_id": evaluation_id,
         "evaluates_count": len(element_list),
         "evaluates": element_list
     }
+
 
 @app.post("/evaluation/{evaluation_id}/ref/{element_id}/", response_model=None, tags=["Evaluation Relationships"])
 async def add_ref_to_evaluation(evaluation_id: int, element_id: int, database: Session = Depends(get_db)):
@@ -2281,25 +2278,25 @@ async def add_ref_to_evaluation(evaluation_id: int, element_id: int, database: S
     db_evaluation = database.query(Evaluation).filter(Evaluation.id == evaluation_id).first()
     if db_evaluation is None:
         raise HTTPException(status_code=404, detail="Evaluation not found")
-    
+
     db_element = database.query(Element).filter(Element.id == element_id).first()
     if db_element is None:
         raise HTTPException(status_code=404, detail="Element not found")
-    
+
     # Check if relationship already exists
     existing = database.query(evaluation_element).filter(
-        (evaluation_element.c.eval == evaluation_id) & 
+        (evaluation_element.c.eval == evaluation_id) &
         (evaluation_element.c.ref == element_id)
     ).first()
-    
+
     if existing:
         raise HTTPException(status_code=400, detail="Relationship already exists")
-    
+
     # Create the association
     association = evaluation_element.insert().values(eval=evaluation_id, ref=element_id)
     database.execute(association)
     database.commit()
-    
+
     return {"message": "Element added to ref successfully"}
 
 
@@ -2309,24 +2306,24 @@ async def remove_ref_from_evaluation(evaluation_id: int, element_id: int, databa
     db_evaluation = database.query(Evaluation).filter(Evaluation.id == evaluation_id).first()
     if db_evaluation is None:
         raise HTTPException(status_code=404, detail="Evaluation not found")
-    
+
     # Check if relationship exists
     existing = database.query(evaluation_element).filter(
-        (evaluation_element.c.eval == evaluation_id) & 
+        (evaluation_element.c.eval == evaluation_id) &
         (evaluation_element.c.ref == element_id)
     ).first()
-    
+
     if not existing:
         raise HTTPException(status_code=404, detail="Relationship not found")
-    
+
     # Delete the association
     association = evaluation_element.delete().where(
-        (evaluation_element.c.eval == evaluation_id) & 
+        (evaluation_element.c.eval == evaluation_id) &
         (evaluation_element.c.ref == element_id)
     )
     database.execute(association)
     database.commit()
-    
+
     return {"message": "Element removed from ref successfully"}
 
 
@@ -2336,10 +2333,10 @@ async def get_ref_of_evaluation(evaluation_id: int, database: Session = Depends(
     db_evaluation = database.query(Evaluation).filter(Evaluation.id == evaluation_id).first()
     if db_evaluation is None:
         raise HTTPException(status_code=404, detail="Evaluation not found")
-    
+
     element_ids = database.query(evaluation_element.c.ref).filter(evaluation_element.c.eval == evaluation_id).all()
     element_list = database.query(Element).filter(Element.id.in_([id[0] for id in element_ids])).all()
-    
+
     return {
         "evaluation_id": evaluation_id,
         "ref_count": len(element_list),
@@ -2347,25 +2344,17 @@ async def get_ref_of_evaluation(evaluation_id: int, database: Session = Depends(
     }
 
 
-
-
-
 ############################################
 #
 #   Measure functions
 #
 ############################################
- 
- 
- 
- 
- 
- 
+
 
 @app.get("/measure/", response_model=None, tags=["Measure"])
 def get_all_measure(detailed: bool = False, database: Session = Depends(get_db)) -> list:
     from sqlalchemy.orm import joinedload
-    
+
     # Use detailed=true to get entities with eagerly loaded relationships (for tables with lookup columns)
     if detailed:
         # Eagerly load all relationships to avoid N+1 queries
@@ -2374,7 +2363,7 @@ def get_all_measure(detailed: bool = False, database: Session = Depends(get_db))
         query = query.options(joinedload(Measure.metric))
         query = query.options(joinedload(Measure.observation))
         measure_list = query.all()
-        
+
         # Serialize with relationships included
         result = []
         for measure_item in measure_list:
@@ -2407,8 +2396,7 @@ def get_all_measure(detailed: bool = False, database: Session = Depends(get_db))
                 item_dict['observation'] = related_dict
             else:
                 item_dict['observation'] = None
-            
-            
+
             result.append(item_dict)
         return result
     else:
@@ -2424,7 +2412,8 @@ def get_count_measure(database: Session = Depends(get_db)) -> dict:
 
 
 @app.get("/measure/paginated/", response_model=None, tags=["Measure"])
-def get_paginated_measure(skip: int = 0, limit: int = 100, detailed: bool = False, database: Session = Depends(get_db)) -> dict:
+def get_paginated_measure(skip: int = 0, limit: int = 100, detailed: bool = False,
+                          database: Session = Depends(get_db)) -> dict:
     """Get paginated list of Measure entities"""
     total = database.query(Measure).count()
     measure_list = database.query(Measure).offset(skip).limit(limit).all()
@@ -2438,12 +2427,11 @@ def get_paginated_measure(skip: int = 0, limit: int = 100, detailed: bool = Fals
 
 @app.get("/measure/search/", response_model=None, tags=["Measure"])
 def search_measure(
-    database: Session = Depends(get_db)
+        database: Session = Depends(get_db)
 ) -> list:
     """Search Measure entities by attributes"""
     query = database.query(Measure)
-    
-    
+
     results = query.all()
     return results
 
@@ -2456,14 +2444,12 @@ async def get_measure(measure_id: int, database: Session = Depends(get_db)) -> M
 
     response_data = {
         "measure": db_measure,
-}
+    }
     return response_data
-
 
 
 @app.post("/measure/", response_model=None, tags=["Measure"])
 async def create_measure(measure_data: MeasureCreate, database: Session = Depends(get_db)) -> Measure:
-
     if measure_data.measurand is not None:
         db_measurand = database.query(Element).filter(Element.id == measure_data.measurand).first()
         if not db_measurand:
@@ -2484,15 +2470,14 @@ async def create_measure(measure_data: MeasureCreate, database: Session = Depend
         raise HTTPException(status_code=400, detail="Observation ID is required")
 
     db_measure = Measure(
-        uncertainty=measure_data.uncertainty,        value=measure_data.value,        error=measure_data.error,        unit=measure_data.unit,        measurand_id=measure_data.measurand,        metric_id=measure_data.metric,        observation_id=measure_data.observation        )
+        uncertainty=measure_data.uncertainty, value=measure_data.value, error=measure_data.error,
+        unit=measure_data.unit, measurand_id=measure_data.measurand, metric_id=measure_data.metric,
+        observation_id=measure_data.observation)
 
     database.add(db_measure)
     database.commit()
     database.refresh(db_measure)
 
-
-
-    
     return db_measure
 
 
@@ -2501,7 +2486,7 @@ async def bulk_create_measure(items: list[MeasureCreate], database: Session = De
     """Create multiple Measure entities at once"""
     created_items = []
     errors = []
-    
+
     for idx, item_data in enumerate(items):
         try:
             # Basic validation for each item
@@ -2511,19 +2496,20 @@ async def bulk_create_measure(items: list[MeasureCreate], database: Session = De
                 raise ValueError("Metric ID is required")
             if not item_data.observation:
                 raise ValueError("Observation ID is required")
-            
+
             db_measure = Measure(
-                uncertainty=item_data.uncertainty,                value=item_data.value,                error=item_data.error,                unit=item_data.unit,                measurand_id=item_data.measurand,                metric_id=item_data.metric,                observation_id=item_data.observation            )
+                uncertainty=item_data.uncertainty, value=item_data.value, error=item_data.error, unit=item_data.unit,
+                measurand_id=item_data.measurand, metric_id=item_data.metric, observation_id=item_data.observation)
             database.add(db_measure)
             database.flush()  # Get ID without committing
             created_items.append(db_measure.id)
         except Exception as e:
             errors.append({"index": idx, "error": str(e)})
-    
+
     if errors:
         database.rollback()
         raise HTTPException(status_code=400, detail={"message": "Bulk creation failed", "errors": errors})
-    
+
     database.commit()
     return {
         "created_count": len(created_items),
@@ -2537,7 +2523,7 @@ async def bulk_delete_measure(ids: list[int], database: Session = Depends(get_db
     """Delete multiple Measure entities at once"""
     deleted_count = 0
     not_found = []
-    
+
     for item_id in ids:
         db_measure = database.query(Measure).filter(Measure.id == item_id).first()
         if db_measure:
@@ -2545,14 +2531,15 @@ async def bulk_delete_measure(ids: list[int], database: Session = Depends(get_db
             deleted_count += 1
         else:
             not_found.append(item_id)
-    
+
     database.commit()
-    
+
     return {
         "deleted_count": deleted_count,
         "not_found": not_found,
         "message": f"Successfully deleted {deleted_count} Measure entities"
     }
+
 
 @app.put("/measure/{measure_id}/", response_model=None, tags=["Measure"])
 async def update_measure(measure_id: int, measure_data: MeasureCreate, database: Session = Depends(get_db)) -> Measure:
@@ -2581,7 +2568,7 @@ async def update_measure(measure_id: int, measure_data: MeasureCreate, database:
         setattr(db_measure, 'observation_id', measure_data.observation)
     database.commit()
     database.refresh(db_measure)
-    
+
     return db_measure
 
 
@@ -2595,9 +2582,6 @@ async def delete_measure(measure_id: int, database: Session = Depends(get_db)):
     return db_measure
 
 
-
-
-
 ############################################
 #
 #   AssessmentElement functions
@@ -2607,7 +2591,7 @@ async def delete_measure(measure_id: int, database: Session = Depends(get_db)):
 @app.get("/assessmentelement/", response_model=None, tags=["AssessmentElement"])
 def get_all_assessmentelement(detailed: bool = False, database: Session = Depends(get_db)) -> list:
     from sqlalchemy.orm import joinedload
-    
+
     return database.query(AssessmentElement).all()
 
 
@@ -2619,7 +2603,8 @@ def get_count_assessmentelement(database: Session = Depends(get_db)) -> dict:
 
 
 @app.get("/assessmentelement/paginated/", response_model=None, tags=["AssessmentElement"])
-def get_paginated_assessmentelement(skip: int = 0, limit: int = 100, detailed: bool = False, database: Session = Depends(get_db)) -> dict:
+def get_paginated_assessmentelement(skip: int = 0, limit: int = 100, detailed: bool = False,
+                                    database: Session = Depends(get_db)) -> dict:
     """Get paginated list of AssessmentElement entities"""
     total = database.query(AssessmentElement).count()
     assessmentelement_list = database.query(AssessmentElement).offset(skip).limit(limit).all()
@@ -2633,68 +2618,64 @@ def get_paginated_assessmentelement(skip: int = 0, limit: int = 100, detailed: b
 
 @app.get("/assessmentelement/search/", response_model=None, tags=["AssessmentElement"])
 def search_assessmentelement(
-    database: Session = Depends(get_db)
+        database: Session = Depends(get_db)
 ) -> list:
     """Search AssessmentElement entities by attributes"""
     query = database.query(AssessmentElement)
-    
-    
+
     results = query.all()
     return results
 
 
 @app.get("/assessmentelement/{assessmentelement_id}/", response_model=None, tags=["AssessmentElement"])
 async def get_assessmentelement(assessmentelement_id: int, database: Session = Depends(get_db)) -> AssessmentElement:
-    db_assessmentelement = database.query(AssessmentElement).filter(AssessmentElement.id == assessmentelement_id).first()
+    db_assessmentelement = database.query(AssessmentElement).filter(
+        AssessmentElement.id == assessmentelement_id).first()
     if db_assessmentelement is None:
         raise HTTPException(status_code=404, detail="AssessmentElement not found")
 
     response_data = {
         "assessmentelement": db_assessmentelement,
-}
+    }
     return response_data
 
 
-
 @app.post("/assessmentelement/", response_model=None, tags=["AssessmentElement"])
-async def create_assessmentelement(assessmentelement_data: AssessmentElementCreate, database: Session = Depends(get_db)) -> AssessmentElement:
-
-
+async def create_assessmentelement(assessmentelement_data: AssessmentElementCreate,
+                                   database: Session = Depends(get_db)) -> AssessmentElement:
     db_assessmentelement = AssessmentElement(
-        name=assessmentelement_data.name,        description=assessmentelement_data.description        )
+        name=assessmentelement_data.name, description=assessmentelement_data.description)
 
     database.add(db_assessmentelement)
     database.commit()
     database.refresh(db_assessmentelement)
 
-
-
-    
     return db_assessmentelement
 
 
 @app.post("/assessmentelement/bulk/", response_model=None, tags=["AssessmentElement"])
-async def bulk_create_assessmentelement(items: list[AssessmentElementCreate], database: Session = Depends(get_db)) -> dict:
+async def bulk_create_assessmentelement(items: list[AssessmentElementCreate],
+                                        database: Session = Depends(get_db)) -> dict:
     """Create multiple AssessmentElement entities at once"""
     created_items = []
     errors = []
-    
+
     for idx, item_data in enumerate(items):
         try:
             # Basic validation for each item
-            
+
             db_assessmentelement = AssessmentElement(
-                name=item_data.name,                description=item_data.description            )
+                name=item_data.name, description=item_data.description)
             database.add(db_assessmentelement)
             database.flush()  # Get ID without committing
             created_items.append(db_assessmentelement.id)
         except Exception as e:
             errors.append({"index": idx, "error": str(e)})
-    
+
     if errors:
         database.rollback()
         raise HTTPException(status_code=400, detail={"message": "Bulk creation failed", "errors": errors})
-    
+
     database.commit()
     return {
         "created_count": len(created_items),
@@ -2708,7 +2689,7 @@ async def bulk_delete_assessmentelement(ids: list[int], database: Session = Depe
     """Delete multiple AssessmentElement entities at once"""
     deleted_count = 0
     not_found = []
-    
+
     for item_id in ids:
         db_assessmentelement = database.query(AssessmentElement).filter(AssessmentElement.id == item_id).first()
         if db_assessmentelement:
@@ -2716,18 +2697,21 @@ async def bulk_delete_assessmentelement(ids: list[int], database: Session = Depe
             deleted_count += 1
         else:
             not_found.append(item_id)
-    
+
     database.commit()
-    
+
     return {
         "deleted_count": deleted_count,
         "not_found": not_found,
         "message": f"Successfully deleted {deleted_count} AssessmentElement entities"
     }
 
+
 @app.put("/assessmentelement/{assessmentelement_id}/", response_model=None, tags=["AssessmentElement"])
-async def update_assessmentelement(assessmentelement_id: int, assessmentelement_data: AssessmentElementCreate, database: Session = Depends(get_db)) -> AssessmentElement:
-    db_assessmentelement = database.query(AssessmentElement).filter(AssessmentElement.id == assessmentelement_id).first()
+async def update_assessmentelement(assessmentelement_id: int, assessmentelement_data: AssessmentElementCreate,
+                                   database: Session = Depends(get_db)) -> AssessmentElement:
+    db_assessmentelement = database.query(AssessmentElement).filter(
+        AssessmentElement.id == assessmentelement_id).first()
     if db_assessmentelement is None:
         raise HTTPException(status_code=404, detail="AssessmentElement not found")
 
@@ -2735,13 +2719,14 @@ async def update_assessmentelement(assessmentelement_id: int, assessmentelement_
     setattr(db_assessmentelement, 'description', assessmentelement_data.description)
     database.commit()
     database.refresh(db_assessmentelement)
-    
+
     return db_assessmentelement
 
 
 @app.delete("/assessmentelement/{assessmentelement_id}/", response_model=None, tags=["AssessmentElement"])
 async def delete_assessmentelement(assessmentelement_id: int, database: Session = Depends(get_db)):
-    db_assessmentelement = database.query(AssessmentElement).filter(AssessmentElement.id == assessmentelement_id).first()
+    db_assessmentelement = database.query(AssessmentElement).filter(
+        AssessmentElement.id == assessmentelement_id).first()
     if db_assessmentelement is None:
         raise HTTPException(status_code=404, detail="AssessmentElement not found")
     database.delete(db_assessmentelement)
@@ -2749,27 +2734,17 @@ async def delete_assessmentelement(assessmentelement_id: int, database: Session 
     return db_assessmentelement
 
 
-
-
-
 ############################################
 #
 #   Observation functions
 #
 ############################################
- 
- 
- 
- 
- 
- 
- 
- 
+
 
 @app.get("/observation/", response_model=None, tags=["Observation"])
 def get_all_observation(detailed: bool = False, database: Session = Depends(get_db)) -> list:
     from sqlalchemy.orm import joinedload
-    
+
     # Use detailed=true to get entities with eagerly loaded relationships (for tables with lookup columns)
     if detailed:
         # Eagerly load all relationships to avoid N+1 queries
@@ -2778,13 +2753,13 @@ def get_all_observation(detailed: bool = False, database: Session = Depends(get_
         query = query.options(joinedload(Observation.eval))
         query = query.options(joinedload(Observation.dataset))
         observation_list = query.all()
-        
+
         # Serialize with relationships included
         result = []
         for observation_item in observation_list:
             item_dict = observation_item.__dict__.copy()
             item_dict.pop('_sa_instance_state', None)
-            
+
             # Add many-to-one relationships (foreign keys for lookup columns)
             if observation_item.tool:
                 related_obj = observation_item.tool
@@ -2807,7 +2782,7 @@ def get_all_observation(detailed: bool = False, database: Session = Depends(get_
                 item_dict['dataset'] = related_dict
             else:
                 item_dict['dataset'] = None
-            
+
             # Add many-to-many and one-to-many relationship objects (full details)
             measure_list = database.query(Measure).filter(Measure.observation_id == observation_item.id).all()
             item_dict['measures'] = []
@@ -2815,7 +2790,7 @@ def get_all_observation(detailed: bool = False, database: Session = Depends(get_
                 measure_dict = measure_obj.__dict__.copy()
                 measure_dict.pop('_sa_instance_state', None)
                 item_dict['measures'].append(measure_dict)
-            
+
             result.append(item_dict)
         return result
     else:
@@ -2831,7 +2806,8 @@ def get_count_observation(database: Session = Depends(get_db)) -> dict:
 
 
 @app.get("/observation/paginated/", response_model=None, tags=["Observation"])
-def get_paginated_observation(skip: int = 0, limit: int = 100, detailed: bool = False, database: Session = Depends(get_db)) -> dict:
+def get_paginated_observation(skip: int = 0, limit: int = 100, detailed: bool = False,
+                              database: Session = Depends(get_db)) -> dict:
     """Get paginated list of Observation entities"""
     total = database.query(Observation).count()
     observation_list = database.query(Observation).offset(skip).limit(limit).all()
@@ -2844,13 +2820,13 @@ def get_paginated_observation(skip: int = 0, limit: int = 100, detailed: bool = 
             "limit": limit,
             "data": observation_list
         }
-    
+
     result = []
     for observation_item in observation_list:
         measures_ids = database.query(Measure.id).filter(Measure.observation_id == observation_item.id).all()
         item_data = {
             "observation": observation_item,
-            "measures_ids": [x[0] for x in measures_ids]        }
+            "measures_ids": [x[0] for x in measures_ids]}
         result.append(item_data)
     return {
         "total": total,
@@ -2862,12 +2838,11 @@ def get_paginated_observation(skip: int = 0, limit: int = 100, detailed: bool = 
 
 @app.get("/observation/search/", response_model=None, tags=["Observation"])
 def search_observation(
-    database: Session = Depends(get_db)
+        database: Session = Depends(get_db)
 ) -> list:
     """Search Observation entities by attributes"""
     query = database.query(Observation)
-    
-    
+
     results = query.all()
     return results
 
@@ -2885,10 +2860,8 @@ async def get_observation(observation_id: int, database: Session = Depends(get_d
     return response_data
 
 
-
 @app.post("/observation/", response_model=None, tags=["Observation"])
 async def create_observation(observation_data: ObservationCreate, database: Session = Depends(get_db)) -> Observation:
-
     if observation_data.tool is not None:
         db_tool = database.query(Tool).filter(Tool.id == observation_data.tool).first()
         if not db_tool:
@@ -2909,7 +2882,9 @@ async def create_observation(observation_data: ObservationCreate, database: Sess
         raise HTTPException(status_code=400, detail="Dataset ID is required")
 
     db_observation = Observation(
-        name=observation_data.name,        description=observation_data.description,        whenObserved=observation_data.whenObserved,        observer=observation_data.observer,        tool_id=observation_data.tool,        eval_id=observation_data.eval,        dataset_id=observation_data.dataset        )
+        name=observation_data.name, description=observation_data.description,
+        whenObserved=observation_data.whenObserved, observer=observation_data.observer, tool_id=observation_data.tool,
+        eval_id=observation_data.eval, dataset_id=observation_data.dataset)
 
     database.add(db_observation)
     database.commit()
@@ -2921,19 +2896,17 @@ async def create_observation(observation_data: ObservationCreate, database: Sess
             db_measure = database.query(Measure).filter(Measure.id == measure_id).first()
             if not db_measure:
                 raise HTTPException(status_code=400, detail=f"Measure with id {measure_id} not found")
-        
+
         # Update the related entities with the new foreign key
         database.query(Measure).filter(Measure.id.in_(observation_data.measures)).update(
             {Measure.observation_id: db_observation.id}, synchronize_session=False
         )
         database.commit()
 
-
-    
     measures_ids = database.query(Measure.id).filter(Measure.observation_id == db_observation.id).all()
     response_data = {
         "observation": db_observation,
-        "measures_ids": [x[0] for x in measures_ids]    }
+        "measures_ids": [x[0] for x in measures_ids]}
     return response_data
 
 
@@ -2942,7 +2915,7 @@ async def bulk_create_observation(items: list[ObservationCreate], database: Sess
     """Create multiple Observation entities at once"""
     created_items = []
     errors = []
-    
+
     for idx, item_data in enumerate(items):
         try:
             # Basic validation for each item
@@ -2952,19 +2925,21 @@ async def bulk_create_observation(items: list[ObservationCreate], database: Sess
                 raise ValueError("Evaluation ID is required")
             if not item_data.dataset:
                 raise ValueError("Dataset ID is required")
-            
+
             db_observation = Observation(
-                name=item_data.name,                description=item_data.description,                whenObserved=item_data.whenObserved,                observer=item_data.observer,                tool_id=item_data.tool,                eval_id=item_data.eval,                dataset_id=item_data.dataset            )
+                name=item_data.name, description=item_data.description, whenObserved=item_data.whenObserved,
+                observer=item_data.observer, tool_id=item_data.tool, eval_id=item_data.eval,
+                dataset_id=item_data.dataset)
             database.add(db_observation)
             database.flush()  # Get ID without committing
             created_items.append(db_observation.id)
         except Exception as e:
             errors.append({"index": idx, "error": str(e)})
-    
+
     if errors:
         database.rollback()
         raise HTTPException(status_code=400, detail={"message": "Bulk creation failed", "errors": errors})
-    
+
     database.commit()
     return {
         "created_count": len(created_items),
@@ -2978,7 +2953,7 @@ async def bulk_delete_observation(ids: list[int], database: Session = Depends(ge
     """Delete multiple Observation entities at once"""
     deleted_count = 0
     not_found = []
-    
+
     for item_id in ids:
         db_observation = database.query(Observation).filter(Observation.id == item_id).first()
         if db_observation:
@@ -2986,17 +2961,19 @@ async def bulk_delete_observation(ids: list[int], database: Session = Depends(ge
             deleted_count += 1
         else:
             not_found.append(item_id)
-    
+
     database.commit()
-    
+
     return {
         "deleted_count": deleted_count,
         "not_found": not_found,
         "message": f"Successfully deleted {deleted_count} Observation entities"
     }
 
+
 @app.put("/observation/{observation_id}/", response_model=None, tags=["Observation"])
-async def update_observation(observation_id: int, observation_data: ObservationCreate, database: Session = Depends(get_db)) -> Observation:
+async def update_observation(observation_id: int, observation_data: ObservationCreate,
+                             database: Session = Depends(get_db)) -> Observation:
     db_observation = database.query(Observation).filter(Observation.id == observation_id).first()
     if db_observation is None:
         raise HTTPException(status_code=404, detail="Observation not found")
@@ -3023,7 +3000,7 @@ async def update_observation(observation_id: int, observation_data: ObservationC
         database.query(Measure).filter(Measure.observation_id == db_observation.id).update(
             {Measure.observation_id: None}, synchronize_session=False
         )
-        
+
         # Set new relationships if list is not empty
         if observation_data.measures:
             # Validate that all IDs exist
@@ -3031,18 +3008,18 @@ async def update_observation(observation_id: int, observation_data: ObservationC
                 db_measure = database.query(Measure).filter(Measure.id == measure_id).first()
                 if not db_measure:
                     raise HTTPException(status_code=400, detail=f"Measure with id {measure_id} not found")
-            
+
             # Update the related entities with the new foreign key
             database.query(Measure).filter(Measure.id.in_(observation_data.measures)).update(
                 {Measure.observation_id: db_observation.id}, synchronize_session=False
             )
     database.commit()
     database.refresh(db_observation)
-    
+
     measures_ids = database.query(Measure.id).filter(Measure.observation_id == db_observation.id).all()
     response_data = {
         "observation": db_observation,
-        "measures_ids": [x[0] for x in measures_ids]    }
+        "measures_ids": [x[0] for x in measures_ids]}
     return response_data
 
 
@@ -3056,40 +3033,30 @@ async def delete_observation(observation_id: int, database: Session = Depends(ge
     return db_observation
 
 
-
-
-
 ############################################
 #
 #   Element functions
 #
 ############################################
- 
- 
- 
- 
- 
- 
- 
- 
+
 
 @app.get("/element/", response_model=None, tags=["Element"])
 def get_all_element(detailed: bool = False, database: Session = Depends(get_db)) -> list:
     from sqlalchemy.orm import joinedload
-    
+
     # Use detailed=true to get entities with eagerly loaded relationships (for tables with lookup columns)
     if detailed:
         # Eagerly load all relationships to avoid N+1 queries
         query = database.query(Element)
         query = query.options(joinedload(Element.project))
         element_list = query.all()
-        
+
         # Serialize with relationships included
         result = []
         for element_item in element_list:
             item_dict = element_item.__dict__.copy()
             item_dict.pop('_sa_instance_state', None)
-            
+
             # Add many-to-one relationships (foreign keys for lookup columns)
             if element_item.project:
                 related_obj = element_item.project
@@ -3098,15 +3065,19 @@ def get_all_element(detailed: bool = False, database: Session = Depends(get_db))
                 item_dict['project'] = related_dict
             else:
                 item_dict['project'] = None
-            
+
             # Add many-to-many and one-to-many relationship objects (full details)
-            evaluation_list = database.query(Evaluation).join(evaluates_eval, Evaluation.id == evaluates_eval.c.evalu).filter(evaluates_eval.c.evaluates == element_item.id).all()
+            evaluation_list = database.query(Evaluation).join(evaluates_eval,
+                                                              Evaluation.id == evaluates_eval.c.evalu).filter(
+                evaluates_eval.c.evaluates == element_item.id).all()
             item_dict['evalu'] = []
             for evaluation_obj in evaluation_list:
                 evaluation_dict = evaluation_obj.__dict__.copy()
                 evaluation_dict.pop('_sa_instance_state', None)
                 item_dict['evalu'].append(evaluation_dict)
-            evaluation_list = database.query(Evaluation).join(evaluation_element, Evaluation.id == evaluation_element.c.eval).filter(evaluation_element.c.ref == element_item.id).all()
+            evaluation_list = database.query(Evaluation).join(evaluation_element,
+                                                              Evaluation.id == evaluation_element.c.eval).filter(
+                evaluation_element.c.ref == element_item.id).all()
             item_dict['eval'] = []
             for evaluation_obj in evaluation_list:
                 evaluation_dict = evaluation_obj.__dict__.copy()
@@ -3118,7 +3089,7 @@ def get_all_element(detailed: bool = False, database: Session = Depends(get_db))
                 measure_dict = measure_obj.__dict__.copy()
                 measure_dict.pop('_sa_instance_state', None)
                 item_dict['measure'].append(measure_dict)
-            
+
             result.append(item_dict)
         return result
     else:
@@ -3134,7 +3105,8 @@ def get_count_element(database: Session = Depends(get_db)) -> dict:
 
 
 @app.get("/element/paginated/", response_model=None, tags=["Element"])
-def get_paginated_element(skip: int = 0, limit: int = 100, detailed: bool = False, database: Session = Depends(get_db)) -> dict:
+def get_paginated_element(skip: int = 0, limit: int = 100, detailed: bool = False,
+                          database: Session = Depends(get_db)) -> dict:
     """Get paginated list of Element entities"""
     total = database.query(Element).count()
     element_list = database.query(Element).offset(skip).limit(limit).all()
@@ -3147,17 +3119,19 @@ def get_paginated_element(skip: int = 0, limit: int = 100, detailed: bool = Fals
             "limit": limit,
             "data": element_list
         }
-    
+
     result = []
     for element_item in element_list:
-        evaluation_ids = database.query(evaluates_eval.c.evalu).filter(evaluates_eval.c.evaluates == element_item.id).all()
-        evaluation_ids = database.query(evaluation_element.c.eval).filter(evaluation_element.c.ref == element_item.id).all()
+        evaluation_ids = database.query(evaluates_eval.c.evalu).filter(
+            evaluates_eval.c.evaluates == element_item.id).all()
+        evaluation_ids = database.query(evaluation_element.c.eval).filter(
+            evaluation_element.c.ref == element_item.id).all()
         measure_ids = database.query(Measure.id).filter(Measure.measurand_id == element_item.id).all()
         item_data = {
             "element": element_item,
             "evaluation_ids": [x[0] for x in evaluation_ids],
             "evaluation_ids": [x[0] for x in evaluation_ids],
-            "measure_ids": [x[0] for x in measure_ids]        }
+            "measure_ids": [x[0] for x in measure_ids]}
         result.append(item_data)
     return {
         "total": total,
@@ -3169,12 +3143,11 @@ def get_paginated_element(skip: int = 0, limit: int = 100, detailed: bool = Fals
 
 @app.get("/element/search/", response_model=None, tags=["Element"])
 def search_element(
-    database: Session = Depends(get_db)
+        database: Session = Depends(get_db)
 ) -> list:
     """Search Element entities by attributes"""
     query = database.query(Element)
-    
-    
+
     results = query.all()
     return results
 
@@ -3196,11 +3169,9 @@ async def get_element(element_id: int, database: Session = Depends(get_db)) -> E
     return response_data
 
 
-
 @app.post("/element/", response_model=None, tags=["Element"])
 async def create_element(element_data: ElementCreate, database: Session = Depends(get_db)) -> Element:
-
-    if element_data.project :
+    if element_data.project:
         db_project = database.query(Project).filter(Project.id == element_data.project).first()
         if not db_project:
             raise HTTPException(status_code=400, detail="Project not found")
@@ -3218,7 +3189,7 @@ async def create_element(element_data: ElementCreate, database: Session = Depend
                 raise HTTPException(status_code=404, detail=f"Evaluation with ID {id} not found")
 
     db_element = Element(
-        name=element_data.name,        description=element_data.description,        project_id=element_data.project        )
+        name=element_data.name, description=element_data.description, project_id=element_data.project)
 
     database.add(db_element)
     database.commit()
@@ -3230,7 +3201,7 @@ async def create_element(element_data: ElementCreate, database: Session = Depend
             db_measure = database.query(Measure).filter(Measure.id == measure_id).first()
             if not db_measure:
                 raise HTTPException(status_code=400, detail=f"Measure with id {measure_id} not found")
-        
+
         # Update the related entities with the new foreign key
         database.query(Measure).filter(Measure.id.in_(element_data.measure)).update(
             {Measure.measurand_id: db_element.id}, synchronize_session=False
@@ -3254,7 +3225,6 @@ async def create_element(element_data: ElementCreate, database: Session = Depend
             database.execute(association)
             database.commit()
 
-    
     evaluation_ids = database.query(evaluates_eval.c.evalu).filter(evaluates_eval.c.evaluates == db_element.id).all()
     evaluation_ids = database.query(evaluation_element.c.eval).filter(evaluation_element.c.ref == db_element.id).all()
     measure_ids = database.query(Measure.id).filter(Measure.measurand_id == db_element.id).all()
@@ -3262,7 +3232,7 @@ async def create_element(element_data: ElementCreate, database: Session = Depend
         "element": db_element,
         "evaluation_ids": [x[0] for x in evaluation_ids],
         "evaluation_ids": [x[0] for x in evaluation_ids],
-        "measure_ids": [x[0] for x in measure_ids]    }
+        "measure_ids": [x[0] for x in measure_ids]}
     return response_data
 
 
@@ -3271,23 +3241,23 @@ async def bulk_create_element(items: list[ElementCreate], database: Session = De
     """Create multiple Element entities at once"""
     created_items = []
     errors = []
-    
+
     for idx, item_data in enumerate(items):
         try:
             # Basic validation for each item
-            
+
             db_element = Element(
-                name=item_data.name,                description=item_data.description,                project_id=item_data.project            )
+                name=item_data.name, description=item_data.description, project_id=item_data.project)
             database.add(db_element)
             database.flush()  # Get ID without committing
             created_items.append(db_element.id)
         except Exception as e:
             errors.append({"index": idx, "error": str(e)})
-    
+
     if errors:
         database.rollback()
         raise HTTPException(status_code=400, detail={"message": "Bulk creation failed", "errors": errors})
-    
+
     database.commit()
     return {
         "created_count": len(created_items),
@@ -3301,7 +3271,7 @@ async def bulk_delete_element(ids: list[int], database: Session = Depends(get_db
     """Delete multiple Element entities at once"""
     deleted_count = 0
     not_found = []
-    
+
     for item_id in ids:
         db_element = database.query(Element).filter(Element.id == item_id).first()
         if db_element:
@@ -3309,14 +3279,15 @@ async def bulk_delete_element(ids: list[int], database: Session = Depends(get_db
             deleted_count += 1
         else:
             not_found.append(item_id)
-    
+
     database.commit()
-    
+
     return {
         "deleted_count": deleted_count,
         "not_found": not_found,
         "message": f"Successfully deleted {deleted_count} Element entities"
     }
+
 
 @app.put("/element/{element_id}/", response_model=None, tags=["Element"])
 async def update_element(element_id: int, element_data: ElementCreate, database: Session = Depends(get_db)) -> Element:
@@ -3336,7 +3307,7 @@ async def update_element(element_id: int, element_data: ElementCreate, database:
         database.query(Measure).filter(Measure.measurand_id == db_element.id).update(
             {Measure.measurand_id: None}, synchronize_session=False
         )
-        
+
         # Set new relationships if list is not empty
         if element_data.measure:
             # Validate that all IDs exist
@@ -3344,7 +3315,7 @@ async def update_element(element_id: int, element_data: ElementCreate, database:
                 db_measure = database.query(Measure).filter(Measure.id == measure_id).first()
                 if not db_measure:
                     raise HTTPException(status_code=400, detail=f"Measure with id {measure_id} not found")
-            
+
             # Update the related entities with the new foreign key
             database.query(Measure).filter(Measure.id.in_(element_data.measure)).update(
                 {Measure.measurand_id: db_element.id}, synchronize_session=False
@@ -3367,7 +3338,7 @@ async def update_element(element_id: int, element_data: ElementCreate, database:
         database.execute(association)
     existing_evaluation_ids = [assoc.eval for assoc in database.execute(
         evaluation_element.select().where(evaluation_element.c.ref == db_element.id))]
-    
+
     evaluations_to_remove = set(existing_evaluation_ids) - set(element_data.eval)
     for evaluation_id in evaluations_to_remove:
         association = evaluation_element.delete().where(
@@ -3383,7 +3354,7 @@ async def update_element(element_id: int, element_data: ElementCreate, database:
         database.execute(association)
     database.commit()
     database.refresh(db_element)
-    
+
     evaluation_ids = database.query(evaluates_eval.c.evalu).filter(evaluates_eval.c.evaluates == db_element.id).all()
     evaluation_ids = database.query(evaluation_element.c.eval).filter(evaluation_element.c.ref == db_element.id).all()
     measure_ids = database.query(Measure.id).filter(Measure.measurand_id == db_element.id).all()
@@ -3391,7 +3362,7 @@ async def update_element(element_id: int, element_data: ElementCreate, database:
         "element": db_element,
         "evaluation_ids": [x[0] for x in evaluation_ids],
         "evaluation_ids": [x[0] for x in evaluation_ids],
-        "measure_ids": [x[0] for x in measure_ids]    }
+        "measure_ids": [x[0] for x in measure_ids]}
     return response_data
 
 
@@ -3403,6 +3374,7 @@ async def delete_element(element_id: int, database: Session = Depends(get_db)):
     database.delete(db_element)
     database.commit()
     return db_element
+
 
 @app.post("/element/{element_id}/evalu/{evaluation_id}/", response_model=None, tags=["Element Relationships"])
 async def add_evalu_to_element(element_id: int, evaluation_id: int, database: Session = Depends(get_db)):
@@ -3475,31 +3447,32 @@ async def get_evalu_of_element(element_id: int, database: Session = Depends(get_
         "evalu": evaluation_list
     }
 
+
 @app.post("/element/{element_id}/eval/{evaluation_id}/", response_model=None, tags=["Element Relationships"])
 async def add_eval_to_element(element_id: int, evaluation_id: int, database: Session = Depends(get_db)):
     """Add a Evaluation to this Element's eval relationship"""
     db_element = database.query(Element).filter(Element.id == element_id).first()
     if db_element is None:
         raise HTTPException(status_code=404, detail="Element not found")
-    
+
     db_evaluation = database.query(Evaluation).filter(Evaluation.id == evaluation_id).first()
     if db_evaluation is None:
         raise HTTPException(status_code=404, detail="Evaluation not found")
-    
+
     # Check if relationship already exists
     existing = database.query(evaluation_element).filter(
-        (evaluation_element.c.ref == element_id) & 
+        (evaluation_element.c.ref == element_id) &
         (evaluation_element.c.eval == evaluation_id)
     ).first()
-    
+
     if existing:
         raise HTTPException(status_code=400, detail="Relationship already exists")
-    
+
     # Create the association
     association = evaluation_element.insert().values(ref=element_id, eval=evaluation_id)
     database.execute(association)
     database.commit()
-    
+
     return {"message": "Evaluation added to eval successfully"}
 
 
@@ -3509,24 +3482,24 @@ async def remove_eval_from_element(element_id: int, evaluation_id: int, database
     db_element = database.query(Element).filter(Element.id == element_id).first()
     if db_element is None:
         raise HTTPException(status_code=404, detail="Element not found")
-    
+
     # Check if relationship exists
     existing = database.query(evaluation_element).filter(
-        (evaluation_element.c.ref == element_id) & 
+        (evaluation_element.c.ref == element_id) &
         (evaluation_element.c.eval == evaluation_id)
     ).first()
-    
+
     if not existing:
         raise HTTPException(status_code=404, detail="Relationship not found")
-    
+
     # Delete the association
     association = evaluation_element.delete().where(
-        (evaluation_element.c.ref == element_id) & 
+        (evaluation_element.c.ref == element_id) &
         (evaluation_element.c.eval == evaluation_id)
     )
     database.execute(association)
     database.commit()
-    
+
     return {"message": "Evaluation removed from eval successfully"}
 
 
@@ -3536,10 +3509,10 @@ async def get_eval_of_element(element_id: int, database: Session = Depends(get_d
     db_element = database.query(Element).filter(Element.id == element_id).first()
     if db_element is None:
         raise HTTPException(status_code=404, detail="Element not found")
-    
+
     evaluation_ids = database.query(evaluation_element.c.eval).filter(evaluation_element.c.ref == element_id).all()
     evaluation_list = database.query(Evaluation).filter(Evaluation.id.in_([id[0] for id in evaluation_ids])).all()
-    
+
     return {
         "element_id": element_id,
         "eval_count": len(evaluation_list),
@@ -3547,19 +3520,11 @@ async def get_eval_of_element(element_id: int, database: Session = Depends(get_d
     }
 
 
-
-
-
 ############################################
 #
 #   Metric functions
 #
 ############################################
-
-
-
-
-
 
 
 @app.get("/metric/", response_model=None, tags=["Metric"])
@@ -3581,13 +3546,17 @@ def get_all_metric(detailed: bool = False, database: Session = Depends(get_db)) 
             # Add many-to-one relationships (foreign keys for lookup columns)
 
             # Add many-to-many and one-to-many relationship objects (full details)
-            metriccategory_list = database.query(MetricCategory).join(metriccategory_metric, MetricCategory.id == metriccategory_metric.c.category).filter(metriccategory_metric.c.metrics == metric_item.id).all()
+            metriccategory_list = database.query(MetricCategory).join(metriccategory_metric,
+                                                                      MetricCategory.id == metriccategory_metric.c.category).filter(
+                metriccategory_metric.c.metrics == metric_item.id).all()
             item_dict['category'] = []
             for metriccategory_obj in metriccategory_list:
                 metriccategory_dict = metriccategory_obj.__dict__.copy()
                 metriccategory_dict.pop('_sa_instance_state', None)
                 item_dict['category'].append(metriccategory_dict)
-            derived_list = database.query(Derived).join(derived_metric, Derived.id == derived_metric.c.derivedBy).filter(derived_metric.c.baseMetric == metric_item.id).all()
+            derived_list = database.query(Derived).join(derived_metric,
+                                                        Derived.id == derived_metric.c.derivedBy).filter(
+                derived_metric.c.baseMetric == metric_item.id).all()
             item_dict['derivedBy'] = []
             for derived_obj in derived_list:
                 derived_dict = derived_obj.__dict__.copy()
@@ -3626,7 +3595,8 @@ def get_count_metric(database: Session = Depends(get_db)) -> dict:
 
 
 @app.get("/metric/paginated/", response_model=None, tags=["Metric"])
-def get_paginated_metric(skip: int = 0, limit: int = 100, detailed: bool = False, database: Session = Depends(get_db)) -> dict:
+def get_paginated_metric(skip: int = 0, limit: int = 100, detailed: bool = False,
+                         database: Session = Depends(get_db)) -> dict:
     """Get paginated list of Metric entities"""
     total = database.query(Metric).count()
     metric_list = database.query(Metric).offset(skip).limit(limit).all()
@@ -3642,14 +3612,16 @@ def get_paginated_metric(skip: int = 0, limit: int = 100, detailed: bool = False
 
     result = []
     for metric_item in metric_list:
-        metriccategory_ids = database.query(metriccategory_metric.c.category).filter(metriccategory_metric.c.metrics == metric_item.id).all()
-        derived_ids = database.query(derived_metric.c.derivedBy).filter(derived_metric.c.baseMetric == metric_item.id).all()
+        metriccategory_ids = database.query(metriccategory_metric.c.category).filter(
+            metriccategory_metric.c.metrics == metric_item.id).all()
+        derived_ids = database.query(derived_metric.c.derivedBy).filter(
+            derived_metric.c.baseMetric == metric_item.id).all()
         measures_ids = database.query(Measure.id).filter(Measure.metric_id == metric_item.id).all()
         item_data = {
             "metric": metric_item,
             "metriccategory_ids": [x[0] for x in metriccategory_ids],
             "derived_ids": [x[0] for x in derived_ids],
-            "measures_ids": [x[0] for x in measures_ids]        }
+            "measures_ids": [x[0] for x in measures_ids]}
         result.append(item_data)
     return {
         "total": total,
@@ -3661,11 +3633,10 @@ def get_paginated_metric(skip: int = 0, limit: int = 100, detailed: bool = False
 
 @app.get("/metric/search/", response_model=None, tags=["Metric"])
 def search_metric(
-    database: Session = Depends(get_db)
+        database: Session = Depends(get_db)
 ) -> list:
     """Search Metric entities by attributes"""
     query = database.query(Metric)
-
 
     results = query.all()
     return results
@@ -3677,7 +3648,8 @@ async def get_metric(metric_id: int, database: Session = Depends(get_db)) -> Met
     if db_metric is None:
         raise HTTPException(status_code=404, detail="Metric not found")
 
-    metriccategory_ids = database.query(metriccategory_metric.c.category).filter(metriccategory_metric.c.metrics == db_metric.id).all()
+    metriccategory_ids = database.query(metriccategory_metric.c.category).filter(
+        metriccategory_metric.c.metrics == db_metric.id).all()
     derived_ids = database.query(derived_metric.c.derivedBy).filter(derived_metric.c.baseMetric == db_metric.id).all()
     measures_ids = database.query(Measure.id).filter(Measure.metric_id == db_metric.id).all()
     response_data = {
@@ -3688,10 +3660,8 @@ async def get_metric(metric_id: int, database: Session = Depends(get_db)) -> Met
     return response_data
 
 
-
 @app.post("/metric/", response_model=None, tags=["Metric"])
 async def create_metric(metric_data: MetricCreate, database: Session = Depends(get_db)) -> Metric:
-
     if metric_data.category:
         for id in metric_data.category:
             # Entity already validated before creation
@@ -3706,7 +3676,7 @@ async def create_metric(metric_data: MetricCreate, database: Session = Depends(g
                 raise HTTPException(status_code=404, detail=f"Derived with ID {id} not found")
 
     db_metric = Metric(
-        name=metric_data.name,        description=metric_data.description        )
+        name=metric_data.name, description=metric_data.description)
 
     database.add(db_metric)
     database.commit()
@@ -3742,15 +3712,15 @@ async def create_metric(metric_data: MetricCreate, database: Session = Depends(g
             database.execute(association)
             database.commit()
 
-
-    metriccategory_ids = database.query(metriccategory_metric.c.category).filter(metriccategory_metric.c.metrics == db_metric.id).all()
+    metriccategory_ids = database.query(metriccategory_metric.c.category).filter(
+        metriccategory_metric.c.metrics == db_metric.id).all()
     derived_ids = database.query(derived_metric.c.derivedBy).filter(derived_metric.c.baseMetric == db_metric.id).all()
     measures_ids = database.query(Measure.id).filter(Measure.metric_id == db_metric.id).all()
     response_data = {
         "metric": db_metric,
         "metriccategory_ids": [x[0] for x in metriccategory_ids],
         "derived_ids": [x[0] for x in derived_ids],
-        "measures_ids": [x[0] for x in measures_ids]    }
+        "measures_ids": [x[0] for x in measures_ids]}
     return response_data
 
 
@@ -3765,7 +3735,7 @@ async def bulk_create_metric(items: list[MetricCreate], database: Session = Depe
             # Basic validation for each item
 
             db_metric = Metric(
-                name=item_data.name,                description=item_data.description            )
+                name=item_data.name, description=item_data.description)
             database.add(db_metric)
             database.flush()  # Get ID without committing
             created_items.append(db_metric.id)
@@ -3805,6 +3775,7 @@ async def bulk_delete_metric(ids: list[int], database: Session = Depends(get_db)
         "not_found": not_found,
         "message": f"Successfully deleted {deleted_count} Metric entities"
     }
+
 
 @app.put("/metric/{metric_id}/", response_model=None, tags=["Metric"])
 async def update_metric(metric_id: int, metric_data: MetricCreate, database: Session = Depends(get_db)) -> Metric:
@@ -3865,14 +3836,15 @@ async def update_metric(metric_id: int, metric_data: MetricCreate, database: Ses
     database.commit()
     database.refresh(db_metric)
 
-    metriccategory_ids = database.query(metriccategory_metric.c.category).filter(metriccategory_metric.c.metrics == db_metric.id).all()
+    metriccategory_ids = database.query(metriccategory_metric.c.category).filter(
+        metriccategory_metric.c.metrics == db_metric.id).all()
     derived_ids = database.query(derived_metric.c.derivedBy).filter(derived_metric.c.baseMetric == db_metric.id).all()
     measures_ids = database.query(Measure.id).filter(Measure.metric_id == db_metric.id).all()
     response_data = {
         "metric": db_metric,
         "metriccategory_ids": [x[0] for x in metriccategory_ids],
         "derived_ids": [x[0] for x in derived_ids],
-        "measures_ids": [x[0] for x in measures_ids]    }
+        "measures_ids": [x[0] for x in measures_ids]}
     return response_data
 
 
@@ -3885,6 +3857,7 @@ async def delete_metric(metric_id: int, database: Session = Depends(get_db)):
     database.commit()
     return db_metric
 
+
 @app.post("/metric/{metric_id}/category/{metriccategory_id}/", response_model=None, tags=["Metric Relationships"])
 async def add_category_to_metric(metric_id: int, metriccategory_id: int, database: Session = Depends(get_db)):
     """Add a MetricCategory to this Metric's category relationship"""
@@ -3895,7 +3868,7 @@ async def add_category_to_metric(metric_id: int, metriccategory_id: int, databas
     db_metriccategory = database.query(MetricCategory).filter(MetricCategory.id == metriccategory_id).first()
     if db_metriccategory is None:
         raise HTTPException(status_code=404, detail="MetricCategory not found")
-    
+
     # Check if relationship already exists
     existing = database.query(metriccategory_metric).filter(
         (metriccategory_metric.c.metrics == metric_id) &
@@ -3947,14 +3920,17 @@ async def get_category_of_metric(metric_id: int, database: Session = Depends(get
     if db_metric is None:
         raise HTTPException(status_code=404, detail="Metric not found")
 
-    metriccategory_ids = database.query(metriccategory_metric.c.category).filter(metriccategory_metric.c.metrics == metric_id).all()
-    metriccategory_list = database.query(MetricCategory).filter(MetricCategory.id.in_([id[0] for id in metriccategory_ids])).all()
+    metriccategory_ids = database.query(metriccategory_metric.c.category).filter(
+        metriccategory_metric.c.metrics == metric_id).all()
+    metriccategory_list = database.query(MetricCategory).filter(
+        MetricCategory.id.in_([id[0] for id in metriccategory_ids])).all()
 
     return {
         "metric_id": metric_id,
         "category_count": len(metriccategory_list),
         "category": metriccategory_list
     }
+
 
 @app.post("/metric/{metric_id}/derivedBy/{derived_id}/", response_model=None, tags=["Metric Relationships"])
 async def add_derivedBy_to_metric(metric_id: int, derived_id: int, database: Session = Depends(get_db)):
@@ -3972,15 +3948,15 @@ async def add_derivedBy_to_metric(metric_id: int, derived_id: int, database: Ses
         (derived_metric.c.baseMetric == metric_id) &
         (derived_metric.c.derivedBy == derived_id)
     ).first()
-    
+
     if existing:
         raise HTTPException(status_code=400, detail="Relationship already exists")
-    
+
     # Create the association
     association = derived_metric.insert().values(baseMetric=metric_id, derivedBy=derived_id)
     database.execute(association)
     database.commit()
-    
+
     return {"message": "Derived added to derivedBy successfully"}
 
 
@@ -3990,16 +3966,16 @@ async def remove_derivedBy_from_metric(metric_id: int, derived_id: int, database
     db_metric = database.query(Metric).filter(Metric.id == metric_id).first()
     if db_metric is None:
         raise HTTPException(status_code=404, detail="Metric not found")
-    
+
     # Check if relationship exists
     existing = database.query(derived_metric).filter(
         (derived_metric.c.baseMetric == metric_id) &
         (derived_metric.c.derivedBy == derived_id)
     ).first()
-    
+
     if not existing:
         raise HTTPException(status_code=404, detail="Relationship not found")
-    
+
     # Delete the association
     association = derived_metric.delete().where(
         (derived_metric.c.baseMetric == metric_id) &
@@ -4007,7 +3983,7 @@ async def remove_derivedBy_from_metric(metric_id: int, derived_id: int, database
     )
     database.execute(association)
     database.commit()
-    
+
     return {"message": "Derived removed from derivedBy successfully"}
 
 
@@ -4017,10 +3993,10 @@ async def get_derivedBy_of_metric(metric_id: int, database: Session = Depends(ge
     db_metric = database.query(Metric).filter(Metric.id == metric_id).first()
     if db_metric is None:
         raise HTTPException(status_code=404, detail="Metric not found")
-    
+
     derived_ids = database.query(derived_metric.c.derivedBy).filter(derived_metric.c.baseMetric == metric_id).all()
     derived_list = database.query(Derived).filter(Derived.id.in_([id[0] for id in derived_ids])).all()
-    
+
     return {
         "metric_id": metric_id,
         "derivedBy_count": len(derived_list),
@@ -4028,47 +4004,43 @@ async def get_derivedBy_of_metric(metric_id: int, database: Session = Depends(ge
     }
 
 
-
-
-
 ############################################
 #
 #   Direct functions
 #
 ############################################
- 
- 
- 
- 
- 
 
 
 @app.get("/direct/", response_model=None, tags=["Direct"])
 def get_all_direct(detailed: bool = False, database: Session = Depends(get_db)) -> list:
     from sqlalchemy.orm import joinedload
-    
+
     # Use detailed=true to get entities with eagerly loaded relationships (for tables with lookup columns)
     if detailed:
         # Eagerly load all relationships to avoid N+1 queries
         query = database.query(Direct)
         direct_list = query.all()
-        
+
         # Serialize with relationships included
         result = []
         for direct_item in direct_list:
             item_dict = direct_item.__dict__.copy()
             item_dict.pop('_sa_instance_state', None)
-            
+
             # Add many-to-one relationships (foreign keys for lookup columns)
-            
+
             # Add many-to-many and one-to-many relationship objects (full details)
-            metriccategory_list = database.query(MetricCategory).join(metriccategory_metric, MetricCategory.id == metriccategory_metric.c.category).filter(metriccategory_metric.c.metrics == direct_item.id).all()
+            metriccategory_list = database.query(MetricCategory).join(metriccategory_metric,
+                                                                      MetricCategory.id == metriccategory_metric.c.category).filter(
+                metriccategory_metric.c.metrics == direct_item.id).all()
             item_dict['category'] = []
             for metriccategory_obj in metriccategory_list:
                 metriccategory_dict = metriccategory_obj.__dict__.copy()
                 metriccategory_dict.pop('_sa_instance_state', None)
                 item_dict['category'].append(metriccategory_dict)
-            derived_list = database.query(Derived).join(derived_metric, Derived.id == derived_metric.c.derivedBy).filter(derived_metric.c.baseMetric == direct_item.id).all()
+            derived_list = database.query(Derived).join(derived_metric,
+                                                        Derived.id == derived_metric.c.derivedBy).filter(
+                derived_metric.c.baseMetric == direct_item.id).all()
             item_dict['derivedBy'] = []
             for derived_obj in derived_list:
                 derived_dict = derived_obj.__dict__.copy()
@@ -4080,7 +4052,7 @@ def get_all_direct(detailed: bool = False, database: Session = Depends(get_db)) 
                 measure_dict = measure_obj.__dict__.copy()
                 measure_dict.pop('_sa_instance_state', None)
                 item_dict['measures'].append(measure_dict)
-            
+
             result.append(item_dict)
         return result
     else:
@@ -4096,7 +4068,8 @@ def get_count_direct(database: Session = Depends(get_db)) -> dict:
 
 
 @app.get("/direct/paginated/", response_model=None, tags=["Direct"])
-def get_paginated_direct(skip: int = 0, limit: int = 100, detailed: bool = False, database: Session = Depends(get_db)) -> dict:
+def get_paginated_direct(skip: int = 0, limit: int = 100, detailed: bool = False,
+                         database: Session = Depends(get_db)) -> dict:
     """Get paginated list of Direct entities"""
     total = database.query(Direct).count()
     direct_list = database.query(Direct).offset(skip).limit(limit).all()
@@ -4109,17 +4082,19 @@ def get_paginated_direct(skip: int = 0, limit: int = 100, detailed: bool = False
             "limit": limit,
             "data": direct_list
         }
-    
+
     result = []
     for direct_item in direct_list:
-        metriccategory_ids = database.query(metriccategory_metric.c.category).filter(metriccategory_metric.c.metrics == direct_item.id).all()
-        derived_ids = database.query(derived_metric.c.derivedBy).filter(derived_metric.c.baseMetric == direct_item.id).all()
+        metriccategory_ids = database.query(metriccategory_metric.c.category).filter(
+            metriccategory_metric.c.metrics == direct_item.id).all()
+        derived_ids = database.query(derived_metric.c.derivedBy).filter(
+            derived_metric.c.baseMetric == direct_item.id).all()
         measures_ids = database.query(Measure.id).filter(Measure.metric_id == direct_item.id).all()
         item_data = {
             "direct": direct_item,
             "metriccategory_ids": [x[0] for x in metriccategory_ids],
             "derived_ids": [x[0] for x in derived_ids],
-            "measures_ids": [x[0] for x in measures_ids]        }
+            "measures_ids": [x[0] for x in measures_ids]}
         result.append(item_data)
     return {
         "total": total,
@@ -4131,12 +4106,11 @@ def get_paginated_direct(skip: int = 0, limit: int = 100, detailed: bool = False
 
 @app.get("/direct/search/", response_model=None, tags=["Direct"])
 def search_direct(
-    database: Session = Depends(get_db)
+        database: Session = Depends(get_db)
 ) -> list:
     """Search Direct entities by attributes"""
     query = database.query(Direct)
-    
-    
+
     results = query.all()
     return results
 
@@ -4147,7 +4121,8 @@ async def get_direct(direct_id: int, database: Session = Depends(get_db)) -> Dir
     if db_direct is None:
         raise HTTPException(status_code=404, detail="Direct not found")
 
-    metriccategory_ids = database.query(metriccategory_metric.c.category).filter(metriccategory_metric.c.metrics == db_direct.id).all()
+    metriccategory_ids = database.query(metriccategory_metric.c.category).filter(
+        metriccategory_metric.c.metrics == db_direct.id).all()
     derived_ids = database.query(derived_metric.c.derivedBy).filter(derived_metric.c.baseMetric == db_direct.id).all()
     measures_ids = database.query(Measure.id).filter(Measure.metric_id == db_direct.id).all()
     response_data = {
@@ -4158,10 +4133,8 @@ async def get_direct(direct_id: int, database: Session = Depends(get_db)) -> Dir
     return response_data
 
 
-
 @app.post("/direct/", response_model=None, tags=["Direct"])
 async def create_direct(direct_data: DirectCreate, database: Session = Depends(get_db)) -> Direct:
-
     if direct_data.category:
         for id in direct_data.category:
             # Entity already validated before creation
@@ -4176,7 +4149,7 @@ async def create_direct(direct_data: DirectCreate, database: Session = Depends(g
                 raise HTTPException(status_code=404, detail=f"Derived with ID {id} not found")
 
     db_direct = Direct(
-        )
+    )
 
     database.add(db_direct)
     database.commit()
@@ -4188,7 +4161,7 @@ async def create_direct(direct_data: DirectCreate, database: Session = Depends(g
             db_measure = database.query(Measure).filter(Measure.id == measure_id).first()
             if not db_measure:
                 raise HTTPException(status_code=400, detail=f"Measure with id {measure_id} not found")
-        
+
         # Update the related entities with the new foreign key
         database.query(Measure).filter(Measure.id.in_(direct_data.measures)).update(
             {Measure.metric_id: db_direct.id}, synchronize_session=False
@@ -4212,15 +4185,15 @@ async def create_direct(direct_data: DirectCreate, database: Session = Depends(g
             database.execute(association)
             database.commit()
 
-    
-    metriccategory_ids = database.query(metriccategory_metric.c.category).filter(metriccategory_metric.c.metrics == db_direct.id).all()
+    metriccategory_ids = database.query(metriccategory_metric.c.category).filter(
+        metriccategory_metric.c.metrics == db_direct.id).all()
     derived_ids = database.query(derived_metric.c.derivedBy).filter(derived_metric.c.baseMetric == db_direct.id).all()
     measures_ids = database.query(Measure.id).filter(Measure.metric_id == db_direct.id).all()
     response_data = {
         "direct": db_direct,
         "metriccategory_ids": [x[0] for x in metriccategory_ids],
         "derived_ids": [x[0] for x in derived_ids],
-        "measures_ids": [x[0] for x in measures_ids]    }
+        "measures_ids": [x[0] for x in measures_ids]}
     return response_data
 
 
@@ -4229,26 +4202,26 @@ async def bulk_create_model(items: list[ModelCreate], database: Session = Depend
     """Create multiple Model entities at once"""
     created_items = []
     errors = []
-    
+
     for idx, item_data in enumerate(items):
         try:
             # Basic validation for each item
             if not item_data.dataset:
                 raise ValueError("Dataset ID is required")
-            
+
             db_model = Model(
-                pid=item_data.pid,                licensing=item_data.licensing.value,                source=item_data.source,                data=item_data.data,
-                dataset_id=item_data.dataset            )
+                pid=item_data.pid, licensing=item_data.licensing.value, source=item_data.source, data=item_data.data,
+                dataset_id=item_data.dataset)
             database.add(db_model)
             database.flush()  # Get ID without committing
             created_items.append(db_model.id)
         except Exception as e:
             errors.append({"index": idx, "error": str(e)})
-    
+
     if errors:
         database.rollback()
         raise HTTPException(status_code=400, detail={"message": "Bulk creation failed", "errors": errors})
-    
+
     database.commit()
     return {
         "created_count": len(created_items),
@@ -4262,7 +4235,7 @@ async def bulk_delete_direct(ids: list[int], database: Session = Depends(get_db)
     """Delete multiple Direct entities at once"""
     deleted_count = 0
     not_found = []
-    
+
     for item_id in ids:
         db_direct = database.query(Direct).filter(Direct.id == item_id).first()
         if db_direct:
@@ -4270,14 +4243,15 @@ async def bulk_delete_direct(ids: list[int], database: Session = Depends(get_db)
             deleted_count += 1
         else:
             not_found.append(item_id)
-    
+
     database.commit()
-    
+
     return {
         "deleted_count": deleted_count,
         "not_found": not_found,
         "message": f"Successfully deleted {deleted_count} Direct entities"
     }
+
 
 @app.put("/direct/{direct_id}/", response_model=None, tags=["Direct"])
 async def update_direct(direct_id: int, direct_data: DirectCreate, database: Session = Depends(get_db)) -> Direct:
@@ -4290,7 +4264,7 @@ async def update_direct(direct_id: int, direct_data: DirectCreate, database: Ses
         database.query(Measure).filter(Measure.metric_id == db_direct.id).update(
             {Measure.metric_id: None}, synchronize_session=False
         )
-        
+
         # Set new relationships if list is not empty
         if direct_data.measures:
             # Validate that all IDs exist
@@ -4298,14 +4272,14 @@ async def update_direct(direct_id: int, direct_data: DirectCreate, database: Ses
                 db_measure = database.query(Measure).filter(Measure.id == measure_id).first()
                 if not db_measure:
                     raise HTTPException(status_code=400, detail=f"Measure with id {measure_id} not found")
-            
+
             # Update the related entities with the new foreign key
             database.query(Measure).filter(Measure.id.in_(direct_data.measures)).update(
                 {Measure.metric_id: db_direct.id}, synchronize_session=False
             )
     existing_metriccategory_ids = [assoc.category for assoc in database.execute(
         metriccategory_metric.select().where(metriccategory_metric.c.metrics == db_direct.id))]
-    
+
     metriccategorys_to_remove = set(existing_metriccategory_ids) - set(direct_data.category)
     for metriccategory_id in metriccategorys_to_remove:
         association = metriccategory_metric.delete().where(
@@ -4321,7 +4295,7 @@ async def update_direct(direct_id: int, direct_data: DirectCreate, database: Ses
         database.execute(association)
     existing_derived_ids = [assoc.derivedBy for assoc in database.execute(
         derived_metric.select().where(derived_metric.c.baseMetric == db_direct.id))]
-    
+
     deriveds_to_remove = set(existing_derived_ids) - set(direct_data.derivedBy)
     for derived_id in deriveds_to_remove:
         association = derived_metric.delete().where(
@@ -4337,15 +4311,16 @@ async def update_direct(direct_id: int, direct_data: DirectCreate, database: Ses
         database.execute(association)
     database.commit()
     database.refresh(db_direct)
-    
-    metriccategory_ids = database.query(metriccategory_metric.c.category).filter(metriccategory_metric.c.metrics == db_direct.id).all()
+
+    metriccategory_ids = database.query(metriccategory_metric.c.category).filter(
+        metriccategory_metric.c.metrics == db_direct.id).all()
     derived_ids = database.query(derived_metric.c.derivedBy).filter(derived_metric.c.baseMetric == db_direct.id).all()
     measures_ids = database.query(Measure.id).filter(Measure.metric_id == db_direct.id).all()
     response_data = {
         "direct": db_direct,
         "metriccategory_ids": [x[0] for x in metriccategory_ids],
         "derived_ids": [x[0] for x in derived_ids],
-        "measures_ids": [x[0] for x in measures_ids]    }
+        "measures_ids": [x[0] for x in measures_ids]}
     return response_data
 
 
@@ -4357,6 +4332,7 @@ async def delete_direct(direct_id: int, database: Session = Depends(get_db)):
     database.delete(db_direct)
     database.commit()
     return db_direct
+
 
 @app.post("/direct/{direct_id}/category/{metriccategory_id}/", response_model=None, tags=["Direct Relationships"])
 async def add_category_to_direct(direct_id: int, metriccategory_id: int, database: Session = Depends(get_db)):
@@ -4419,15 +4395,18 @@ async def get_category_of_direct(direct_id: int, database: Session = Depends(get
     db_direct = database.query(Direct).filter(Direct.id == direct_id).first()
     if db_direct is None:
         raise HTTPException(status_code=404, detail="Direct not found")
-    
-    metriccategory_ids = database.query(metriccategory_metric.c.category).filter(metriccategory_metric.c.metrics == direct_id).all()
-    metriccategory_list = database.query(MetricCategory).filter(MetricCategory.id.in_([id[0] for id in metriccategory_ids])).all()
-    
+
+    metriccategory_ids = database.query(metriccategory_metric.c.category).filter(
+        metriccategory_metric.c.metrics == direct_id).all()
+    metriccategory_list = database.query(MetricCategory).filter(
+        MetricCategory.id.in_([id[0] for id in metriccategory_ids])).all()
+
     return {
         "direct_id": direct_id,
         "category_count": len(metriccategory_list),
         "category": metriccategory_list
     }
+
 
 @app.post("/direct/{direct_id}/derivedBy/{derived_id}/", response_model=None, tags=["Direct Relationships"])
 async def add_derivedBy_to_direct(direct_id: int, derived_id: int, database: Session = Depends(get_db)):
@@ -4445,15 +4424,15 @@ async def add_derivedBy_to_direct(direct_id: int, derived_id: int, database: Ses
         (derived_metric.c.baseMetric == direct_id) &
         (derived_metric.c.derivedBy == derived_id)
     ).first()
-    
+
     if existing:
         raise HTTPException(status_code=400, detail="Relationship already exists")
-    
+
     # Create the association
     association = derived_metric.insert().values(baseMetric=direct_id, derivedBy=derived_id)
     database.execute(association)
     database.commit()
-    
+
     return {"message": "Derived added to derivedBy successfully"}
 
 
@@ -4463,16 +4442,16 @@ async def remove_derivedBy_from_direct(direct_id: int, derived_id: int, database
     db_direct = database.query(Direct).filter(Direct.id == direct_id).first()
     if db_direct is None:
         raise HTTPException(status_code=404, detail="Direct not found")
-    
+
     # Check if relationship exists
     existing = database.query(derived_metric).filter(
         (derived_metric.c.baseMetric == direct_id) &
         (derived_metric.c.derivedBy == derived_id)
     ).first()
-    
+
     if not existing:
         raise HTTPException(status_code=404, detail="Relationship not found")
-    
+
     # Delete the association
     association = derived_metric.delete().where(
         (derived_metric.c.baseMetric == direct_id) &
@@ -4480,7 +4459,7 @@ async def remove_derivedBy_from_direct(direct_id: int, derived_id: int, database
     )
     database.execute(association)
     database.commit()
-    
+
     return {"message": "Derived removed from derivedBy successfully"}
 
 
@@ -4501,15 +4480,11 @@ async def get_derivedBy_of_direct(direct_id: int, database: Session = Depends(ge
     }
 
 
-
-
-
 ############################################
 #
 #   MetricCategory functions
 #
 ############################################
-
 
 
 @app.get("/metriccategory/", response_model=None, tags=["MetricCategory"])
@@ -4531,7 +4506,9 @@ def get_all_metriccategory(detailed: bool = False, database: Session = Depends(g
             # Add many-to-one relationships (foreign keys for lookup columns)
 
             # Add many-to-many and one-to-many relationship objects (full details)
-            metric_list = database.query(Metric).join(metriccategory_metric, Metric.id == metriccategory_metric.c.metrics).filter(metriccategory_metric.c.category == metriccategory_item.id).all()
+            metric_list = database.query(Metric).join(metriccategory_metric,
+                                                      Metric.id == metriccategory_metric.c.metrics).filter(
+                metriccategory_metric.c.category == metriccategory_item.id).all()
             item_dict['metrics'] = []
             for metric_obj in metric_list:
                 metric_dict = metric_obj.__dict__.copy()
@@ -4553,7 +4530,8 @@ def get_count_metriccategory(database: Session = Depends(get_db)) -> dict:
 
 
 @app.get("/metriccategory/paginated/", response_model=None, tags=["MetricCategory"])
-def get_paginated_metriccategory(skip: int = 0, limit: int = 100, detailed: bool = False, database: Session = Depends(get_db)) -> dict:
+def get_paginated_metriccategory(skip: int = 0, limit: int = 100, detailed: bool = False,
+                                 database: Session = Depends(get_db)) -> dict:
     """Get paginated list of MetricCategory entities"""
     total = database.query(MetricCategory).count()
     metriccategory_list = database.query(MetricCategory).offset(skip).limit(limit).all()
@@ -4569,7 +4547,8 @@ def get_paginated_metriccategory(skip: int = 0, limit: int = 100, detailed: bool
 
     result = []
     for metriccategory_item in metriccategory_list:
-        metric_ids = database.query(metriccategory_metric.c.metrics).filter(metriccategory_metric.c.category == metriccategory_item.id).all()
+        metric_ids = database.query(metriccategory_metric.c.metrics).filter(
+            metriccategory_metric.c.category == metriccategory_item.id).all()
         item_data = {
             "metriccategory": metriccategory_item,
             "metric_ids": [x[0] for x in metric_ids],
@@ -4585,11 +4564,10 @@ def get_paginated_metriccategory(skip: int = 0, limit: int = 100, detailed: bool
 
 @app.get("/metriccategory/search/", response_model=None, tags=["MetricCategory"])
 def search_metriccategory(
-    database: Session = Depends(get_db)
+        database: Session = Depends(get_db)
 ) -> list:
     """Search MetricCategory entities by attributes"""
     query = database.query(MetricCategory)
-
 
     results = query.all()
     return results
@@ -4601,18 +4579,18 @@ async def get_metriccategory(metriccategory_id: int, database: Session = Depends
     if db_metriccategory is None:
         raise HTTPException(status_code=404, detail="MetricCategory not found")
 
-    metric_ids = database.query(metriccategory_metric.c.metrics).filter(metriccategory_metric.c.category == db_metriccategory.id).all()
+    metric_ids = database.query(metriccategory_metric.c.metrics).filter(
+        metriccategory_metric.c.category == db_metriccategory.id).all()
     response_data = {
         "metriccategory": db_metriccategory,
         "metric_ids": [x[0] for x in metric_ids],
-}
+    }
     return response_data
 
 
-
 @app.post("/metriccategory/", response_model=None, tags=["MetricCategory"])
-async def create_metriccategory(metriccategory_data: MetricCategoryCreate, database: Session = Depends(get_db)) -> MetricCategory:
-
+async def create_metriccategory(metriccategory_data: MetricCategoryCreate,
+                                database: Session = Depends(get_db)) -> MetricCategory:
     if metriccategory_data.metrics:
         for id in metriccategory_data.metrics:
             # Entity already validated before creation
@@ -4621,12 +4599,11 @@ async def create_metriccategory(metriccategory_data: MetricCategoryCreate, datab
                 raise HTTPException(status_code=404, detail=f"Metric with ID {id} not found")
 
     db_metriccategory = MetricCategory(
-        name=metriccategory_data.name,        description=metriccategory_data.description        )
+        name=metriccategory_data.name, description=metriccategory_data.description)
 
     database.add(db_metriccategory)
     database.commit()
     database.refresh(db_metriccategory)
-
 
     if metriccategory_data.metrics:
         for id in metriccategory_data.metrics:
@@ -4637,8 +4614,8 @@ async def create_metriccategory(metriccategory_data: MetricCategoryCreate, datab
             database.execute(association)
             database.commit()
 
-
-    metric_ids = database.query(metriccategory_metric.c.metrics).filter(metriccategory_metric.c.category == db_metriccategory.id).all()
+    metric_ids = database.query(metriccategory_metric.c.metrics).filter(
+        metriccategory_metric.c.category == db_metriccategory.id).all()
     response_data = {
         "metriccategory": db_metriccategory,
         "metric_ids": [x[0] for x in metric_ids],
@@ -4657,7 +4634,7 @@ async def bulk_create_metriccategory(items: list[MetricCategoryCreate], database
             # Basic validation for each item
 
             db_metriccategory = MetricCategory(
-                name=item_data.name,                description=item_data.description            )
+                name=item_data.name, description=item_data.description)
             database.add(db_metriccategory)
             database.flush()  # Get ID without committing
             created_items.append(db_metriccategory.id)
@@ -4681,7 +4658,7 @@ async def bulk_delete_metriccategory(ids: list[int], database: Session = Depends
     """Delete multiple MetricCategory entities at once"""
     deleted_count = 0
     not_found = []
-    
+
     for item_id in ids:
         db_metriccategory = database.query(MetricCategory).filter(MetricCategory.id == item_id).first()
         if db_metriccategory:
@@ -4691,15 +4668,17 @@ async def bulk_delete_metriccategory(ids: list[int], database: Session = Depends
             not_found.append(item_id)
 
     database.commit()
-    
+
     return {
         "deleted_count": deleted_count,
         "not_found": not_found,
         "message": f"Successfully deleted {deleted_count} MetricCategory entities"
     }
 
+
 @app.put("/metriccategory/{metriccategory_id}/", response_model=None, tags=["MetricCategory"])
-async def update_metriccategory(metriccategory_id: int, metriccategory_data: MetricCategoryCreate, database: Session = Depends(get_db)) -> MetricCategory:
+async def update_metriccategory(metriccategory_id: int, metriccategory_data: MetricCategoryCreate,
+                                database: Session = Depends(get_db)) -> MetricCategory:
     db_metriccategory = database.query(MetricCategory).filter(MetricCategory.id == metriccategory_id).first()
     if db_metriccategory is None:
         raise HTTPException(status_code=404, detail="MetricCategory not found")
@@ -4723,7 +4702,8 @@ async def update_metriccategory(metriccategory_id: int, metriccategory_data: Met
     database.commit()
     database.refresh(db_metriccategory)
 
-    metric_ids = database.query(metriccategory_metric.c.metrics).filter(metriccategory_metric.c.category == db_metriccategory.id).all()
+    metric_ids = database.query(metriccategory_metric.c.metrics).filter(
+        metriccategory_metric.c.category == db_metriccategory.id).all()
     response_data = {
         "metriccategory": db_metriccategory,
         "metric_ids": [x[0] for x in metric_ids],
@@ -4740,50 +4720,54 @@ async def delete_metriccategory(metriccategory_id: int, database: Session = Depe
     database.commit()
     return db_metriccategory
 
-@app.post("/metriccategory/{metriccategory_id}/metrics/{metric_id}/", response_model=None, tags=["MetricCategory Relationships"])
+
+@app.post("/metriccategory/{metriccategory_id}/metrics/{metric_id}/", response_model=None,
+          tags=["MetricCategory Relationships"])
 async def add_metrics_to_metriccategory(metriccategory_id: int, metric_id: int, database: Session = Depends(get_db)):
     """Add a Metric to this MetricCategory's metrics relationship"""
     db_metriccategory = database.query(MetricCategory).filter(MetricCategory.id == metriccategory_id).first()
     if db_metriccategory is None:
         raise HTTPException(status_code=404, detail="MetricCategory not found")
-    
+
     db_metric = database.query(Metric).filter(Metric.id == metric_id).first()
     if db_metric is None:
         raise HTTPException(status_code=404, detail="Metric not found")
-    
+
     # Check if relationship already exists
     existing = database.query(metriccategory_metric).filter(
         (metriccategory_metric.c.category == metriccategory_id) &
         (metriccategory_metric.c.metrics == metric_id)
     ).first()
-    
+
     if existing:
         raise HTTPException(status_code=400, detail="Relationship already exists")
-    
+
     # Create the association
     association = metriccategory_metric.insert().values(category=metriccategory_id, metrics=metric_id)
     database.execute(association)
     database.commit()
-    
+
     return {"message": "Metric added to metrics successfully"}
 
 
-@app.delete("/metriccategory/{metriccategory_id}/metrics/{metric_id}/", response_model=None, tags=["MetricCategory Relationships"])
-async def remove_metrics_from_metriccategory(metriccategory_id: int, metric_id: int, database: Session = Depends(get_db)):
+@app.delete("/metriccategory/{metriccategory_id}/metrics/{metric_id}/", response_model=None,
+            tags=["MetricCategory Relationships"])
+async def remove_metrics_from_metriccategory(metriccategory_id: int, metric_id: int,
+                                             database: Session = Depends(get_db)):
     """Remove a Metric from this MetricCategory's metrics relationship"""
     db_metriccategory = database.query(MetricCategory).filter(MetricCategory.id == metriccategory_id).first()
     if db_metriccategory is None:
         raise HTTPException(status_code=404, detail="MetricCategory not found")
-    
+
     # Check if relationship exists
     existing = database.query(metriccategory_metric).filter(
         (metriccategory_metric.c.category == metriccategory_id) &
         (metriccategory_metric.c.metrics == metric_id)
     ).first()
-    
+
     if not existing:
         raise HTTPException(status_code=404, detail="Relationship not found")
-    
+
     # Delete the association
     association = metriccategory_metric.delete().where(
         (metriccategory_metric.c.category == metriccategory_id) &
@@ -4791,7 +4775,7 @@ async def remove_metrics_from_metriccategory(metriccategory_id: int, metric_id: 
     )
     database.execute(association)
     database.commit()
-    
+
     return {"message": "Metric removed from metrics successfully"}
 
 
@@ -4802,7 +4786,8 @@ async def get_metrics_of_metriccategory(metriccategory_id: int, database: Sessio
     if db_metriccategory is None:
         raise HTTPException(status_code=404, detail="MetricCategory not found")
 
-    metric_ids = database.query(metriccategory_metric.c.metrics).filter(metriccategory_metric.c.category == metriccategory_id).all()
+    metric_ids = database.query(metriccategory_metric.c.metrics).filter(
+        metriccategory_metric.c.category == metriccategory_id).all()
     metric_list = database.query(Metric).filter(Metric.id.in_([id[0] for id in metric_ids])).all()
 
     return {
@@ -4812,15 +4797,11 @@ async def get_metrics_of_metriccategory(metriccategory_id: int, database: Sessio
     }
 
 
-
-
-
 ############################################
 #
 #   LegalRequirement functions
 #
 ############################################
-
 
 
 @app.get("/legalrequirement/", response_model=None, tags=["LegalRequirement"])
@@ -4849,7 +4830,6 @@ def get_all_legalrequirement(detailed: bool = False, database: Session = Depends
             else:
                 item_dict['project_1'] = None
 
-
             result.append(item_dict)
         return result
     else:
@@ -4865,7 +4845,8 @@ def get_count_legalrequirement(database: Session = Depends(get_db)) -> dict:
 
 
 @app.get("/legalrequirement/paginated/", response_model=None, tags=["LegalRequirement"])
-def get_paginated_legalrequirement(skip: int = 0, limit: int = 100, detailed: bool = False, database: Session = Depends(get_db)) -> dict:
+def get_paginated_legalrequirement(skip: int = 0, limit: int = 100, detailed: bool = False,
+                                   database: Session = Depends(get_db)) -> dict:
     """Get paginated list of LegalRequirement entities"""
     total = database.query(LegalRequirement).count()
     legalrequirement_list = database.query(LegalRequirement).offset(skip).limit(limit).all()
@@ -4879,11 +4860,10 @@ def get_paginated_legalrequirement(skip: int = 0, limit: int = 100, detailed: bo
 
 @app.get("/legalrequirement/search/", response_model=None, tags=["LegalRequirement"])
 def search_legalrequirement(
-    database: Session = Depends(get_db)
+        database: Session = Depends(get_db)
 ) -> list:
     """Search LegalRequirement entities by attributes"""
     query = database.query(LegalRequirement)
-
 
     results = query.all()
     return results
@@ -4897,14 +4877,13 @@ async def get_legalrequirement(legalrequirement_id: int, database: Session = Dep
 
     response_data = {
         "legalrequirement": db_legalrequirement,
-}
+    }
     return response_data
 
 
-
 @app.post("/legalrequirement/", response_model=None, tags=["LegalRequirement"])
-async def create_legalrequirement(legalrequirement_data: LegalRequirementCreate, database: Session = Depends(get_db)) -> LegalRequirement:
-
+async def create_legalrequirement(legalrequirement_data: LegalRequirementCreate,
+                                  database: Session = Depends(get_db)) -> LegalRequirement:
     if legalrequirement_data.project_1 is not None:
         db_project_1 = database.query(Project).filter(Project.id == legalrequirement_data.project_1).first()
         if not db_project_1:
@@ -4913,20 +4892,19 @@ async def create_legalrequirement(legalrequirement_data: LegalRequirementCreate,
         raise HTTPException(status_code=400, detail="Project ID is required")
 
     db_legalrequirement = LegalRequirement(
-        legal_ref=legalrequirement_data.legal_ref,        principle=legalrequirement_data.principle,        standard=legalrequirement_data.standard,        project_1_id=legalrequirement_data.project_1        )
+        legal_ref=legalrequirement_data.legal_ref, principle=legalrequirement_data.principle,
+        standard=legalrequirement_data.standard, project_1_id=legalrequirement_data.project_1)
 
     database.add(db_legalrequirement)
     database.commit()
     database.refresh(db_legalrequirement)
 
-
-
-
     return db_legalrequirement
 
 
 @app.post("/legalrequirement/bulk/", response_model=None, tags=["LegalRequirement"])
-async def bulk_create_legalrequirement(items: list[LegalRequirementCreate], database: Session = Depends(get_db)) -> dict:
+async def bulk_create_legalrequirement(items: list[LegalRequirementCreate],
+                                       database: Session = Depends(get_db)) -> dict:
     """Create multiple LegalRequirement entities at once"""
     created_items = []
     errors = []
@@ -4938,7 +4916,8 @@ async def bulk_create_legalrequirement(items: list[LegalRequirementCreate], data
                 raise ValueError("Project ID is required")
 
             db_legalrequirement = LegalRequirement(
-                legal_ref=item_data.legal_ref,                principle=item_data.principle,                standard=item_data.standard,                project_1_id=item_data.project_1            )
+                legal_ref=item_data.legal_ref, principle=item_data.principle, standard=item_data.standard,
+                project_1_id=item_data.project_1)
             database.add(db_legalrequirement)
             database.flush()  # Get ID without committing
             created_items.append(db_legalrequirement.id)
@@ -4979,8 +4958,10 @@ async def bulk_delete_legalrequirement(ids: list[int], database: Session = Depen
         "message": f"Successfully deleted {deleted_count} LegalRequirement entities"
     }
 
+
 @app.put("/legalrequirement/{legalrequirement_id}/", response_model=None, tags=["LegalRequirement"])
-async def update_legalrequirement(legalrequirement_id: int, legalrequirement_data: LegalRequirementCreate, database: Session = Depends(get_db)) -> LegalRequirement:
+async def update_legalrequirement(legalrequirement_id: int, legalrequirement_data: LegalRequirementCreate,
+                                  database: Session = Depends(get_db)) -> LegalRequirement:
     db_legalrequirement = database.query(LegalRequirement).filter(LegalRequirement.id == legalrequirement_id).first()
     if db_legalrequirement is None:
         raise HTTPException(status_code=404, detail="LegalRequirement not found")
@@ -5009,15 +4990,11 @@ async def delete_legalrequirement(legalrequirement_id: int, database: Session = 
     return db_legalrequirement
 
 
-
-
-
 ############################################
 #
 #   Tool functions
 #
 ############################################
-
 
 
 @app.get("/tool/", response_model=None, tags=["Tool"])
@@ -5061,7 +5038,8 @@ def get_count_tool(database: Session = Depends(get_db)) -> dict:
 
 
 @app.get("/tool/paginated/", response_model=None, tags=["Tool"])
-def get_paginated_tool(skip: int = 0, limit: int = 100, detailed: bool = False, database: Session = Depends(get_db)) -> dict:
+def get_paginated_tool(skip: int = 0, limit: int = 100, detailed: bool = False,
+                       database: Session = Depends(get_db)) -> dict:
     """Get paginated list of Tool entities"""
     total = database.query(Tool).count()
     tool_list = database.query(Tool).offset(skip).limit(limit).all()
@@ -5080,7 +5058,7 @@ def get_paginated_tool(skip: int = 0, limit: int = 100, detailed: bool = False, 
         observation_1_ids = database.query(Observation.id).filter(Observation.tool_id == tool_item.id).all()
         item_data = {
             "tool": tool_item,
-            "observation_1_ids": [x[0] for x in observation_1_ids]        }
+            "observation_1_ids": [x[0] for x in observation_1_ids]}
         result.append(item_data)
     return {
         "total": total,
@@ -5092,11 +5070,10 @@ def get_paginated_tool(skip: int = 0, limit: int = 100, detailed: bool = False, 
 
 @app.get("/tool/search/", response_model=None, tags=["Tool"])
 def search_tool(
-    database: Session = Depends(get_db)
+        database: Session = Depends(get_db)
 ) -> list:
     """Search Tool entities by attributes"""
     query = database.query(Tool)
-
 
     results = query.all()
     return results
@@ -5115,13 +5092,10 @@ async def get_tool(tool_id: int, database: Session = Depends(get_db)) -> Tool:
     return response_data
 
 
-
 @app.post("/tool/", response_model=None, tags=["Tool"])
 async def create_tool(tool_data: ToolCreate, database: Session = Depends(get_db)) -> Tool:
-
-
     db_tool = Tool(
-        version=tool_data.version,        licensing=tool_data.licensing.value,        source=tool_data.source,        name=tool_data.name        )
+        version=tool_data.version, licensing=tool_data.licensing.value, source=tool_data.source, name=tool_data.name)
 
     database.add(db_tool)
     database.commit()
@@ -5140,12 +5114,10 @@ async def create_tool(tool_data: ToolCreate, database: Session = Depends(get_db)
         )
         database.commit()
 
-
-
     observation_1_ids = database.query(Observation.id).filter(Observation.tool_id == db_tool.id).all()
     response_data = {
         "tool": db_tool,
-        "observation_1_ids": [x[0] for x in observation_1_ids]    }
+        "observation_1_ids": [x[0] for x in observation_1_ids]}
     return response_data
 
 
@@ -5154,13 +5126,14 @@ async def bulk_create_tool(items: list[ToolCreate], database: Session = Depends(
     """Create multiple Tool entities at once"""
     created_items = []
     errors = []
-    
+
     for idx, item_data in enumerate(items):
         try:
             # Basic validation for each item
 
             db_tool = Tool(
-                version=item_data.version,                licensing=item_data.licensing.value,                source=item_data.source,                name=item_data.name            )
+                version=item_data.version, licensing=item_data.licensing.value, source=item_data.source,
+                name=item_data.name)
             database.add(db_tool)
             database.flush()  # Get ID without committing
             created_items.append(db_tool.id)
@@ -5201,6 +5174,7 @@ async def bulk_delete_tool(ids: list[int], database: Session = Depends(get_db)) 
         "message": f"Successfully deleted {deleted_count} Tool entities"
     }
 
+
 @app.put("/tool/{tool_id}/", response_model=None, tags=["Tool"])
 async def update_tool(tool_id: int, tool_data: ToolCreate, database: Session = Depends(get_db)) -> Tool:
     db_tool = database.query(Tool).filter(Tool.id == tool_id).first()
@@ -5235,7 +5209,7 @@ async def update_tool(tool_id: int, tool_data: ToolCreate, database: Session = D
     observation_1_ids = database.query(Observation.id).filter(Observation.tool_id == db_tool.id).all()
     response_data = {
         "tool": db_tool,
-        "observation_1_ids": [x[0] for x in observation_1_ids]    }
+        "observation_1_ids": [x[0] for x in observation_1_ids]}
     return response_data
 
 
@@ -5249,7 +5223,6 @@ async def delete_tool(tool_id: int, database: Session = Depends(get_db)):
     return db_tool
 
 
-
 ############################################
 #   Tool Method Endpoints
 ############################################
@@ -5257,9 +5230,9 @@ async def delete_tool(tool_id: int, database: Session = Depends(get_db)):
 
 @app.post("/tool/{tool_id}/methods/new_method/", response_model=None, tags=["Tool Methods"])
 async def execute_tool_new_method(
-    tool_id: int,
-    params: dict = Body(default=None, embed=True),
-    database: Session = Depends(get_db)
+        tool_id: int,
+        params: dict = Body(default=None, embed=True),
+        database: Session = Depends(get_db)
 ):
     """
     Execute the new_method method on a Tool instance.
@@ -5306,13 +5279,11 @@ async def execute_tool_new_method(
         raise HTTPException(status_code=500, detail=f"Method execution failed: {str(e)}")
 
 
-
 ############################################
 #
 #   ConfParam functions
 #
 ############################################
-
 
 
 @app.get("/confparam/", response_model=None, tags=["ConfParam"])
@@ -5341,7 +5312,6 @@ def get_all_confparam(detailed: bool = False, database: Session = Depends(get_db
             else:
                 item_dict['conf'] = None
 
-
             result.append(item_dict)
         return result
     else:
@@ -5357,7 +5327,8 @@ def get_count_confparam(database: Session = Depends(get_db)) -> dict:
 
 
 @app.get("/confparam/paginated/", response_model=None, tags=["ConfParam"])
-def get_paginated_confparam(skip: int = 0, limit: int = 100, detailed: bool = False, database: Session = Depends(get_db)) -> dict:
+def get_paginated_confparam(skip: int = 0, limit: int = 100, detailed: bool = False,
+                            database: Session = Depends(get_db)) -> dict:
     """Get paginated list of ConfParam entities"""
     total = database.query(ConfParam).count()
     confparam_list = database.query(ConfParam).offset(skip).limit(limit).all()
@@ -5371,11 +5342,10 @@ def get_paginated_confparam(skip: int = 0, limit: int = 100, detailed: bool = Fa
 
 @app.get("/confparam/search/", response_model=None, tags=["ConfParam"])
 def search_confparam(
-    database: Session = Depends(get_db)
+        database: Session = Depends(get_db)
 ) -> list:
     """Search ConfParam entities by attributes"""
     query = database.query(ConfParam)
-
 
     results = query.all()
     return results
@@ -5389,14 +5359,12 @@ async def get_confparam(confparam_id: int, database: Session = Depends(get_db)) 
 
     response_data = {
         "confparam": db_confparam,
-}
+    }
     return response_data
-
 
 
 @app.post("/confparam/", response_model=None, tags=["ConfParam"])
 async def create_confparam(confparam_data: ConfParamCreate, database: Session = Depends(get_db)) -> ConfParam:
-
     if confparam_data.conf is not None:
         db_conf = database.query(Configuration).filter(Configuration.id == confparam_data.conf).first()
         if not db_conf:
@@ -5405,14 +5373,12 @@ async def create_confparam(confparam_data: ConfParamCreate, database: Session = 
         raise HTTPException(status_code=400, detail="Configuration ID is required")
 
     db_confparam = ConfParam(
-        name=confparam_data.name,        description=confparam_data.description,        param_type=confparam_data.param_type,        value=confparam_data.value,        conf_id=confparam_data.conf        )
+        name=confparam_data.name, description=confparam_data.description, param_type=confparam_data.param_type,
+        value=confparam_data.value, conf_id=confparam_data.conf)
 
     database.add(db_confparam)
     database.commit()
     database.refresh(db_confparam)
-
-
-
 
     return db_confparam
 
@@ -5430,7 +5396,8 @@ async def bulk_create_confparam(items: list[ConfParamCreate], database: Session 
                 raise ValueError("Configuration ID is required")
 
             db_confparam = ConfParam(
-                name=item_data.name,                description=item_data.description,                param_type=item_data.param_type,                value=item_data.value,                conf_id=item_data.conf            )
+                name=item_data.name, description=item_data.description, param_type=item_data.param_type,
+                value=item_data.value, conf_id=item_data.conf)
             database.add(db_confparam)
             database.flush()  # Get ID without committing
             created_items.append(db_confparam.id)
@@ -5471,8 +5438,10 @@ async def bulk_delete_confparam(ids: list[int], database: Session = Depends(get_
         "message": f"Successfully deleted {deleted_count} ConfParam entities"
     }
 
+
 @app.put("/confparam/{confparam_id}/", response_model=None, tags=["ConfParam"])
-async def update_confparam(confparam_id: int, confparam_data: ConfParamCreate, database: Session = Depends(get_db)) -> ConfParam:
+async def update_confparam(confparam_id: int, confparam_data: ConfParamCreate,
+                           database: Session = Depends(get_db)) -> ConfParam:
     db_confparam = database.query(ConfParam).filter(ConfParam.id == confparam_id).first()
     if db_confparam is None:
         raise HTTPException(status_code=404, detail="ConfParam not found")
@@ -5500,17 +5469,11 @@ async def delete_confparam(confparam_id: int, database: Session = Depends(get_db
     return db_confparam
 
 
-
-
-
 ############################################
 #
 #   Configuration functions
 #
 ############################################
-
-
-
 
 
 @app.get("/configuration/", response_model=None, tags=["Configuration"])
@@ -5560,7 +5523,8 @@ def get_count_configuration(database: Session = Depends(get_db)) -> dict:
 
 
 @app.get("/configuration/paginated/", response_model=None, tags=["Configuration"])
-def get_paginated_configuration(skip: int = 0, limit: int = 100, detailed: bool = False, database: Session = Depends(get_db)) -> dict:
+def get_paginated_configuration(skip: int = 0, limit: int = 100, detailed: bool = False,
+                                database: Session = Depends(get_db)) -> dict:
     """Get paginated list of Configuration entities"""
     total = database.query(Configuration).count()
     configuration_list = database.query(Configuration).offset(skip).limit(limit).all()
@@ -5580,7 +5544,7 @@ def get_paginated_configuration(skip: int = 0, limit: int = 100, detailed: bool 
         eval_ids = database.query(Evaluation.id).filter(Evaluation.config_id == configuration_item.id).all()
         item_data = {
             "configuration": configuration_item,
-            "params_ids": [x[0] for x in params_ids],            "eval_ids": [x[0] for x in eval_ids]        }
+            "params_ids": [x[0] for x in params_ids], "eval_ids": [x[0] for x in eval_ids]}
         result.append(item_data)
     return {
         "total": total,
@@ -5592,11 +5556,10 @@ def get_paginated_configuration(skip: int = 0, limit: int = 100, detailed: bool 
 
 @app.get("/configuration/search/", response_model=None, tags=["Configuration"])
 def search_configuration(
-    database: Session = Depends(get_db)
+        database: Session = Depends(get_db)
 ) -> list:
     """Search Configuration entities by attributes"""
     query = database.query(Configuration)
-
 
     results = query.all()
     return results
@@ -5612,17 +5575,15 @@ async def get_configuration(configuration_id: int, database: Session = Depends(g
     eval_ids = database.query(Evaluation.id).filter(Evaluation.config_id == db_configuration.id).all()
     response_data = {
         "configuration": db_configuration,
-        "params_ids": [x[0] for x in params_ids],        "eval_ids": [x[0] for x in eval_ids]}
+        "params_ids": [x[0] for x in params_ids], "eval_ids": [x[0] for x in eval_ids]}
     return response_data
 
 
-
 @app.post("/configuration/", response_model=None, tags=["Configuration"])
-async def create_configuration(configuration_data: ConfigurationCreate, database: Session = Depends(get_db)) -> Configuration:
-
-
+async def create_configuration(configuration_data: ConfigurationCreate,
+                               database: Session = Depends(get_db)) -> Configuration:
     db_configuration = Configuration(
-        name=configuration_data.name,        description=configuration_data.description        )
+        name=configuration_data.name, description=configuration_data.description)
 
     database.add(db_configuration)
     database.commit()
@@ -5653,13 +5614,11 @@ async def create_configuration(configuration_data: ConfigurationCreate, database
         )
         database.commit()
 
-
-
     params_ids = database.query(ConfParam.id).filter(ConfParam.conf_id == db_configuration.id).all()
     eval_ids = database.query(Evaluation.id).filter(Evaluation.config_id == db_configuration.id).all()
     response_data = {
         "configuration": db_configuration,
-        "params_ids": [x[0] for x in params_ids],        "eval_ids": [x[0] for x in eval_ids]    }
+        "params_ids": [x[0] for x in params_ids], "eval_ids": [x[0] for x in eval_ids]}
     return response_data
 
 
@@ -5674,7 +5633,7 @@ async def bulk_create_configuration(items: list[ConfigurationCreate], database: 
             # Basic validation for each item
 
             db_configuration = Configuration(
-                name=item_data.name,                description=item_data.description            )
+                name=item_data.name, description=item_data.description)
             database.add(db_configuration)
             database.flush()  # Get ID without committing
             created_items.append(db_configuration.id)
@@ -5708,15 +5667,17 @@ async def bulk_delete_configuration(ids: list[int], database: Session = Depends(
             not_found.append(item_id)
 
     database.commit()
-    
+
     return {
         "deleted_count": deleted_count,
         "not_found": not_found,
         "message": f"Successfully deleted {deleted_count} Configuration entities"
     }
 
+
 @app.put("/configuration/{configuration_id}/", response_model=None, tags=["Configuration"])
-async def update_configuration(configuration_id: int, configuration_data: ConfigurationCreate, database: Session = Depends(get_db)) -> Configuration:
+async def update_configuration(configuration_id: int, configuration_data: ConfigurationCreate,
+                               database: Session = Depends(get_db)) -> Configuration:
     db_configuration = database.query(Configuration).filter(Configuration.id == configuration_id).first()
     if db_configuration is None:
         raise HTTPException(status_code=404, detail="Configuration not found")
@@ -5764,7 +5725,7 @@ async def update_configuration(configuration_id: int, configuration_data: Config
     eval_ids = database.query(Evaluation.id).filter(Evaluation.config_id == db_configuration.id).all()
     response_data = {
         "configuration": db_configuration,
-        "params_ids": [x[0] for x in params_ids],        "eval_ids": [x[0] for x in eval_ids]    }
+        "params_ids": [x[0] for x in params_ids], "eval_ids": [x[0] for x in eval_ids]}
     return response_data
 
 
@@ -5778,31 +5739,17 @@ async def delete_configuration(configuration_id: int, database: Session = Depend
     return db_configuration
 
 
-
-
-
 ############################################
 #
 #   Feature functions
 #
 ############################################
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
+
 
 @app.get("/feature/", response_model=None, tags=["Feature"])
 def get_all_feature(detailed: bool = False, database: Session = Depends(get_db)) -> list:
     from sqlalchemy.orm import joinedload
-    
+
     # Use detailed=true to get entities with eagerly loaded relationships (for tables with lookup columns)
     if detailed:
         # Eagerly load all relationships to avoid N+1 queries
@@ -5811,13 +5758,13 @@ def get_all_feature(detailed: bool = False, database: Session = Depends(get_db))
         query = query.options(joinedload(Feature.date))
         query = query.options(joinedload(Feature.project))
         feature_list = query.all()
-        
+
         # Serialize with relationships included
         result = []
         for feature_item in feature_list:
             item_dict = feature_item.__dict__.copy()
             item_dict.pop('_sa_instance_state', None)
-            
+
             # Add many-to-one relationships (foreign keys for lookup columns)
             if feature_item.features:
                 related_obj = feature_item.features
@@ -5840,15 +5787,19 @@ def get_all_feature(detailed: bool = False, database: Session = Depends(get_db))
                 item_dict['project'] = related_dict
             else:
                 item_dict['project'] = None
-            
+
             # Add many-to-many and one-to-many relationship objects (full details)
-            evaluation_list = database.query(Evaluation).join(evaluates_eval, Evaluation.id == evaluates_eval.c.evalu).filter(evaluates_eval.c.evaluates == feature_item.id).all()
+            evaluation_list = database.query(Evaluation).join(evaluates_eval,
+                                                              Evaluation.id == evaluates_eval.c.evalu).filter(
+                evaluates_eval.c.evaluates == feature_item.id).all()
             item_dict['evalu'] = []
             for evaluation_obj in evaluation_list:
                 evaluation_dict = evaluation_obj.__dict__.copy()
                 evaluation_dict.pop('_sa_instance_state', None)
                 item_dict['evalu'].append(evaluation_dict)
-            evaluation_list = database.query(Evaluation).join(evaluation_element, Evaluation.id == evaluation_element.c.eval).filter(evaluation_element.c.ref == feature_item.id).all()
+            evaluation_list = database.query(Evaluation).join(evaluation_element,
+                                                              Evaluation.id == evaluation_element.c.eval).filter(
+                evaluation_element.c.ref == feature_item.id).all()
             item_dict['eval'] = []
             for evaluation_obj in evaluation_list:
                 evaluation_dict = evaluation_obj.__dict__.copy()
@@ -5860,7 +5811,7 @@ def get_all_feature(detailed: bool = False, database: Session = Depends(get_db))
                 measure_dict = measure_obj.__dict__.copy()
                 measure_dict.pop('_sa_instance_state', None)
                 item_dict['measure'].append(measure_dict)
-            
+
             result.append(item_dict)
         return result
     else:
@@ -5876,7 +5827,8 @@ def get_count_feature(database: Session = Depends(get_db)) -> dict:
 
 
 @app.get("/feature/paginated/", response_model=None, tags=["Feature"])
-def get_paginated_feature(skip: int = 0, limit: int = 100, detailed: bool = False, database: Session = Depends(get_db)) -> dict:
+def get_paginated_feature(skip: int = 0, limit: int = 100, detailed: bool = False,
+                          database: Session = Depends(get_db)) -> dict:
     """Get paginated list of Feature entities"""
     total = database.query(Feature).count()
     feature_list = database.query(Feature).offset(skip).limit(limit).all()
@@ -5889,17 +5841,19 @@ def get_paginated_feature(skip: int = 0, limit: int = 100, detailed: bool = Fals
             "limit": limit,
             "data": feature_list
         }
-    
+
     result = []
     for feature_item in feature_list:
-        evaluation_ids = database.query(evaluates_eval.c.evalu).filter(evaluates_eval.c.evaluates == feature_item.id).all()
-        evaluation_ids = database.query(evaluation_element.c.eval).filter(evaluation_element.c.ref == feature_item.id).all()
+        evaluation_ids = database.query(evaluates_eval.c.evalu).filter(
+            evaluates_eval.c.evaluates == feature_item.id).all()
+        evaluation_ids = database.query(evaluation_element.c.eval).filter(
+            evaluation_element.c.ref == feature_item.id).all()
         measure_ids = database.query(Measure.id).filter(Measure.measurand_id == feature_item.id).all()
         item_data = {
             "feature": feature_item,
             "evaluation_ids": [x[0] for x in evaluation_ids],
             "evaluation_ids": [x[0] for x in evaluation_ids],
-            "measure_ids": [x[0] for x in measure_ids]        }
+            "measure_ids": [x[0] for x in measure_ids]}
         result.append(item_data)
     return {
         "total": total,
@@ -5911,12 +5865,11 @@ def get_paginated_feature(skip: int = 0, limit: int = 100, detailed: bool = Fals
 
 @app.get("/feature/search/", response_model=None, tags=["Feature"])
 def search_feature(
-    database: Session = Depends(get_db)
+        database: Session = Depends(get_db)
 ) -> list:
     """Search Feature entities by attributes"""
     query = database.query(Feature)
-    
-    
+
     results = query.all()
     return results
 
@@ -5938,10 +5891,8 @@ async def get_feature(feature_id: int, database: Session = Depends(get_db)) -> F
     return response_data
 
 
-
 @app.post("/feature/", response_model=None, tags=["Feature"])
 async def create_feature(feature_data: FeatureCreate, database: Session = Depends(get_db)) -> Feature:
-
     if feature_data.features is not None:
         db_features = database.query(Datashape).filter(Datashape.id == feature_data.features).first()
         if not db_features:
@@ -5954,7 +5905,7 @@ async def create_feature(feature_data: FeatureCreate, database: Session = Depend
             raise HTTPException(status_code=400, detail="Datashape not found")
     else:
         raise HTTPException(status_code=400, detail="Datashape ID is required")
-    if feature_data.project :
+    if feature_data.project:
         db_project = database.query(Project).filter(Project.id == feature_data.project).first()
         if not db_project:
             raise HTTPException(status_code=400, detail="Project not found")
@@ -5972,7 +5923,8 @@ async def create_feature(feature_data: FeatureCreate, database: Session = Depend
                 raise HTTPException(status_code=404, detail=f"Evaluation with ID {id} not found")
 
     db_feature = Feature(
-        min_value=feature_data.min_value,        max_value=feature_data.max_value,        feature_type=feature_data.feature_type,        features_id=feature_data.features,        date_id=feature_data.date,        project_id=feature_data.project        )
+        min_value=feature_data.min_value, max_value=feature_data.max_value, feature_type=feature_data.feature_type,
+        features_id=feature_data.features, date_id=feature_data.date, project_id=feature_data.project)
 
     database.add(db_feature)
     database.commit()
@@ -5984,7 +5936,7 @@ async def create_feature(feature_data: FeatureCreate, database: Session = Depend
             db_measure = database.query(Measure).filter(Measure.id == measure_id).first()
             if not db_measure:
                 raise HTTPException(status_code=400, detail=f"Measure with id {measure_id} not found")
-        
+
         # Update the related entities with the new foreign key
         database.query(Measure).filter(Measure.id.in_(feature_data.measure)).update(
             {Measure.measurand_id: db_feature.id}, synchronize_session=False
@@ -6008,7 +5960,6 @@ async def create_feature(feature_data: FeatureCreate, database: Session = Depend
             database.execute(association)
             database.commit()
 
-
     evaluation_ids = database.query(evaluates_eval.c.evalu).filter(evaluates_eval.c.evaluates == db_feature.id).all()
     evaluation_ids = database.query(evaluation_element.c.eval).filter(evaluation_element.c.ref == db_feature.id).all()
     measure_ids = database.query(Measure.id).filter(Measure.measurand_id == db_feature.id).all()
@@ -6016,7 +5967,7 @@ async def create_feature(feature_data: FeatureCreate, database: Session = Depend
         "feature": db_feature,
         "evaluation_ids": [x[0] for x in evaluation_ids],
         "evaluation_ids": [x[0] for x in evaluation_ids],
-        "measure_ids": [x[0] for x in measure_ids]    }
+        "measure_ids": [x[0] for x in measure_ids]}
     return response_data
 
 
@@ -6025,7 +5976,7 @@ async def bulk_create_feature(items: list[FeatureCreate], database: Session = De
     """Create multiple Feature entities at once"""
     created_items = []
     errors = []
-    
+
     for idx, item_data in enumerate(items):
         try:
             # Basic validation for each item
@@ -6033,19 +5984,20 @@ async def bulk_create_feature(items: list[FeatureCreate], database: Session = De
                 raise ValueError("Datashape ID is required")
             if not item_data.date:
                 raise ValueError("Datashape ID is required")
-            
+
             db_feature = Feature(
-                min_value=item_data.min_value,                max_value=item_data.max_value,                feature_type=item_data.feature_type,                features_id=item_data.features,                date_id=item_data.date            )
+                min_value=item_data.min_value, max_value=item_data.max_value, feature_type=item_data.feature_type,
+                features_id=item_data.features, date_id=item_data.date)
             database.add(db_feature)
             database.flush()  # Get ID without committing
             created_items.append(db_feature.id)
         except Exception as e:
             errors.append({"index": idx, "error": str(e)})
-    
+
     if errors:
         database.rollback()
         raise HTTPException(status_code=400, detail={"message": "Bulk creation failed", "errors": errors})
-    
+
     database.commit()
     return {
         "created_count": len(created_items),
@@ -6059,7 +6011,7 @@ async def bulk_delete_feature(ids: list[int], database: Session = Depends(get_db
     """Delete multiple Feature entities at once"""
     deleted_count = 0
     not_found = []
-    
+
     for item_id in ids:
         db_feature = database.query(Feature).filter(Feature.id == item_id).first()
         if db_feature:
@@ -6067,14 +6019,15 @@ async def bulk_delete_feature(ids: list[int], database: Session = Depends(get_db
             deleted_count += 1
         else:
             not_found.append(item_id)
-    
+
     database.commit()
-    
+
     return {
         "deleted_count": deleted_count,
         "not_found": not_found,
         "message": f"Successfully deleted {deleted_count} Feature entities"
     }
+
 
 @app.put("/feature/{feature_id}/", response_model=None, tags=["Feature"])
 async def update_feature(feature_id: int, feature_data: FeatureCreate, database: Session = Depends(get_db)) -> Feature:
@@ -6100,7 +6053,7 @@ async def update_feature(feature_id: int, feature_data: FeatureCreate, database:
         database.query(Measure).filter(Measure.measurand_id == db_feature.id).update(
             {Measure.measurand_id: None}, synchronize_session=False
         )
-        
+
         # Set new relationships if list is not empty
         if feature_data.measure:
             # Validate that all IDs exist
@@ -6108,14 +6061,14 @@ async def update_feature(feature_id: int, feature_data: FeatureCreate, database:
                 db_measure = database.query(Measure).filter(Measure.id == measure_id).first()
                 if not db_measure:
                     raise HTTPException(status_code=400, detail=f"Measure with id {measure_id} not found")
-            
+
             # Update the related entities with the new foreign key
             database.query(Measure).filter(Measure.id.in_(feature_data.measure)).update(
                 {Measure.measurand_id: db_feature.id}, synchronize_session=False
             )
     existing_evaluation_ids = [assoc.evalu for assoc in database.execute(
         evaluates_eval.select().where(evaluates_eval.c.evaluates == db_feature.id))]
-    
+
     evaluations_to_remove = set(existing_evaluation_ids) - set(feature_data.evalu)
     for evaluation_id in evaluations_to_remove:
         association = evaluates_eval.delete().where(
@@ -6131,7 +6084,7 @@ async def update_feature(feature_id: int, feature_data: FeatureCreate, database:
         database.execute(association)
     existing_evaluation_ids = [assoc.eval for assoc in database.execute(
         evaluation_element.select().where(evaluation_element.c.ref == db_feature.id))]
-    
+
     evaluations_to_remove = set(existing_evaluation_ids) - set(feature_data.eval)
     for evaluation_id in evaluations_to_remove:
         association = evaluation_element.delete().where(
@@ -6147,7 +6100,7 @@ async def update_feature(feature_id: int, feature_data: FeatureCreate, database:
         database.execute(association)
     database.commit()
     database.refresh(db_feature)
-    
+
     evaluation_ids = database.query(evaluates_eval.c.evalu).filter(evaluates_eval.c.evaluates == db_feature.id).all()
     evaluation_ids = database.query(evaluation_element.c.eval).filter(evaluation_element.c.ref == db_feature.id).all()
     measure_ids = database.query(Measure.id).filter(Measure.measurand_id == db_feature.id).all()
@@ -6155,7 +6108,7 @@ async def update_feature(feature_id: int, feature_data: FeatureCreate, database:
         "feature": db_feature,
         "evaluation_ids": [x[0] for x in evaluation_ids],
         "evaluation_ids": [x[0] for x in evaluation_ids],
-        "measure_ids": [x[0] for x in measure_ids]    }
+        "measure_ids": [x[0] for x in measure_ids]}
     return response_data
 
 
@@ -6168,31 +6121,32 @@ async def delete_feature(feature_id: int, database: Session = Depends(get_db)):
     database.commit()
     return db_feature
 
+
 @app.post("/feature/{feature_id}/evalu/{evaluation_id}/", response_model=None, tags=["Feature Relationships"])
 async def add_evalu_to_feature(feature_id: int, evaluation_id: int, database: Session = Depends(get_db)):
     """Add a Evaluation to this Feature's evalu relationship"""
     db_feature = database.query(Feature).filter(Feature.id == feature_id).first()
     if db_feature is None:
         raise HTTPException(status_code=404, detail="Feature not found")
-    
+
     db_evaluation = database.query(Evaluation).filter(Evaluation.id == evaluation_id).first()
     if db_evaluation is None:
         raise HTTPException(status_code=404, detail="Evaluation not found")
-    
+
     # Check if relationship already exists
     existing = database.query(evaluates_eval).filter(
         (evaluates_eval.c.evaluates == feature_id) &
         (evaluates_eval.c.evalu == evaluation_id)
     ).first()
-    
+
     if existing:
         raise HTTPException(status_code=400, detail="Relationship already exists")
-    
+
     # Create the association
     association = evaluates_eval.insert().values(evaluates=feature_id, evalu=evaluation_id)
     database.execute(association)
     database.commit()
-    
+
     return {"message": "Evaluation added to evalu successfully"}
 
 
@@ -6202,16 +6156,16 @@ async def remove_evalu_from_feature(feature_id: int, evaluation_id: int, databas
     db_feature = database.query(Feature).filter(Feature.id == feature_id).first()
     if db_feature is None:
         raise HTTPException(status_code=404, detail="Feature not found")
-    
+
     # Check if relationship exists
     existing = database.query(evaluates_eval).filter(
         (evaluates_eval.c.evaluates == feature_id) &
         (evaluates_eval.c.evalu == evaluation_id)
     ).first()
-    
+
     if not existing:
         raise HTTPException(status_code=404, detail="Relationship not found")
-    
+
     # Delete the association
     association = evaluates_eval.delete().where(
         (evaluates_eval.c.evaluates == feature_id) &
@@ -6219,7 +6173,7 @@ async def remove_evalu_from_feature(feature_id: int, evaluation_id: int, databas
     )
     database.execute(association)
     database.commit()
-    
+
     return {"message": "Evaluation removed from evalu successfully"}
 
 
@@ -6229,15 +6183,16 @@ async def get_evalu_of_feature(feature_id: int, database: Session = Depends(get_
     db_feature = database.query(Feature).filter(Feature.id == feature_id).first()
     if db_feature is None:
         raise HTTPException(status_code=404, detail="Feature not found")
-    
+
     evaluation_ids = database.query(evaluates_eval.c.evalu).filter(evaluates_eval.c.evaluates == feature_id).all()
     evaluation_list = database.query(Evaluation).filter(Evaluation.id.in_([id[0] for id in evaluation_ids])).all()
-    
+
     return {
         "feature_id": feature_id,
         "evalu_count": len(evaluation_list),
         "evalu": evaluation_list
     }
+
 
 @app.post("/feature/{feature_id}/eval/{evaluation_id}/", response_model=None, tags=["Feature Relationships"])
 async def add_eval_to_feature(feature_id: int, evaluation_id: int, database: Session = Depends(get_db)):
@@ -6245,25 +6200,25 @@ async def add_eval_to_feature(feature_id: int, evaluation_id: int, database: Ses
     db_feature = database.query(Feature).filter(Feature.id == feature_id).first()
     if db_feature is None:
         raise HTTPException(status_code=404, detail="Feature not found")
-    
+
     db_evaluation = database.query(Evaluation).filter(Evaluation.id == evaluation_id).first()
     if db_evaluation is None:
         raise HTTPException(status_code=404, detail="Evaluation not found")
-    
+
     # Check if relationship already exists
     existing = database.query(evaluation_element).filter(
         (evaluation_element.c.ref == feature_id) &
         (evaluation_element.c.eval == evaluation_id)
     ).first()
-    
+
     if existing:
         raise HTTPException(status_code=400, detail="Relationship already exists")
-    
+
     # Create the association
     association = evaluation_element.insert().values(ref=feature_id, eval=evaluation_id)
     database.execute(association)
     database.commit()
-    
+
     return {"message": "Evaluation added to eval successfully"}
 
 
@@ -6273,16 +6228,16 @@ async def remove_eval_from_feature(feature_id: int, evaluation_id: int, database
     db_feature = database.query(Feature).filter(Feature.id == feature_id).first()
     if db_feature is None:
         raise HTTPException(status_code=404, detail="Feature not found")
-    
+
     # Check if relationship exists
     existing = database.query(evaluation_element).filter(
         (evaluation_element.c.ref == feature_id) &
         (evaluation_element.c.eval == evaluation_id)
     ).first()
-    
+
     if not existing:
         raise HTTPException(status_code=404, detail="Relationship not found")
-    
+
     # Delete the association
     association = evaluation_element.delete().where(
         (evaluation_element.c.ref == feature_id) &
@@ -6290,7 +6245,7 @@ async def remove_eval_from_feature(feature_id: int, evaluation_id: int, database
     )
     database.execute(association)
     database.commit()
-    
+
     return {"message": "Evaluation removed from eval successfully"}
 
 
@@ -6300,10 +6255,10 @@ async def get_eval_of_feature(feature_id: int, database: Session = Depends(get_d
     db_feature = database.query(Feature).filter(Feature.id == feature_id).first()
     if db_feature is None:
         raise HTTPException(status_code=404, detail="Feature not found")
-    
+
     evaluation_ids = database.query(evaluation_element.c.eval).filter(evaluation_element.c.ref == feature_id).all()
     evaluation_list = database.query(Evaluation).filter(Evaluation.id.in_([id[0] for id in evaluation_ids])).all()
-    
+
     return {
         "feature_id": feature_id,
         "eval_count": len(evaluation_list),
@@ -6311,19 +6266,11 @@ async def get_eval_of_feature(feature_id: int, database: Session = Depends(get_d
     }
 
 
-
-
-
 ############################################
 #
 #   Datashape functions
 #
 ############################################
-
-
-
-
-
 
 
 @app.get("/datashape/", response_model=None, tags=["Datashape"])
@@ -6379,7 +6326,8 @@ def get_count_datashape(database: Session = Depends(get_db)) -> dict:
 
 
 @app.get("/datashape/paginated/", response_model=None, tags=["Datashape"])
-def get_paginated_datashape(skip: int = 0, limit: int = 100, detailed: bool = False, database: Session = Depends(get_db)) -> dict:
+def get_paginated_datashape(skip: int = 0, limit: int = 100, detailed: bool = False,
+                            database: Session = Depends(get_db)) -> dict:
     """Get paginated list of Datashape entities"""
     total = database.query(Datashape).count()
     datashape_list = database.query(Datashape).offset(skip).limit(limit).all()
@@ -6400,7 +6348,8 @@ def get_paginated_datashape(skip: int = 0, limit: int = 100, detailed: bool = Fa
         f_date_ids = database.query(Feature.id).filter(Feature.date_id == datashape_item.id).all()
         item_data = {
             "datashape": datashape_item,
-            "f_features_ids": [x[0] for x in f_features_ids],            "dataset_1_ids": [x[0] for x in dataset_1_ids],            "f_date_ids": [x[0] for x in f_date_ids]        }
+            "f_features_ids": [x[0] for x in f_features_ids], "dataset_1_ids": [x[0] for x in dataset_1_ids],
+            "f_date_ids": [x[0] for x in f_date_ids]}
         result.append(item_data)
     return {
         "total": total,
@@ -6412,11 +6361,10 @@ def get_paginated_datashape(skip: int = 0, limit: int = 100, detailed: bool = Fa
 
 @app.get("/datashape/search/", response_model=None, tags=["Datashape"])
 def search_datashape(
-    database: Session = Depends(get_db)
+        database: Session = Depends(get_db)
 ) -> list:
     """Search Datashape entities by attributes"""
     query = database.query(Datashape)
-
 
     results = query.all()
     return results
@@ -6433,17 +6381,15 @@ async def get_datashape(datashape_id: int, database: Session = Depends(get_db)) 
     f_date_ids = database.query(Feature.id).filter(Feature.date_id == db_datashape.id).all()
     response_data = {
         "datashape": db_datashape,
-        "f_features_ids": [x[0] for x in f_features_ids],        "dataset_1_ids": [x[0] for x in dataset_1_ids],        "f_date_ids": [x[0] for x in f_date_ids]}
+        "f_features_ids": [x[0] for x in f_features_ids], "dataset_1_ids": [x[0] for x in dataset_1_ids],
+        "f_date_ids": [x[0] for x in f_date_ids]}
     return response_data
-
 
 
 @app.post("/datashape/", response_model=None, tags=["Datashape"])
 async def create_datashape(datashape_data: DatashapeCreate, database: Session = Depends(get_db)) -> Datashape:
-
-
     db_datashape = Datashape(
-        accepted_target_values=datashape_data.accepted_target_values        )
+        accepted_target_values=datashape_data.accepted_target_values)
 
     database.add(db_datashape)
     database.commit()
@@ -6486,14 +6432,13 @@ async def create_datashape(datashape_data: DatashapeCreate, database: Session = 
         )
         database.commit()
 
-
-
     f_features_ids = database.query(Feature.id).filter(Feature.features_id == db_datashape.id).all()
     dataset_1_ids = database.query(Dataset.id).filter(Dataset.datashape_id == db_datashape.id).all()
     f_date_ids = database.query(Feature.id).filter(Feature.date_id == db_datashape.id).all()
     response_data = {
         "datashape": db_datashape,
-        "f_features_ids": [x[0] for x in f_features_ids],        "dataset_1_ids": [x[0] for x in dataset_1_ids],        "f_date_ids": [x[0] for x in f_date_ids]    }
+        "f_features_ids": [x[0] for x in f_features_ids], "dataset_1_ids": [x[0] for x in dataset_1_ids],
+        "f_date_ids": [x[0] for x in f_date_ids]}
     return response_data
 
 
@@ -6508,7 +6453,7 @@ async def bulk_create_datashape(items: list[DatashapeCreate], database: Session 
             # Basic validation for each item
 
             db_datashape = Datashape(
-                accepted_target_values=item_data.accepted_target_values            )
+                accepted_target_values=item_data.accepted_target_values)
             database.add(db_datashape)
             database.flush()  # Get ID without committing
             created_items.append(db_datashape.id)
@@ -6549,8 +6494,10 @@ async def bulk_delete_datashape(ids: list[int], database: Session = Depends(get_
         "message": f"Successfully deleted {deleted_count} Datashape entities"
     }
 
+
 @app.put("/datashape/{datashape_id}/", response_model=None, tags=["Datashape"])
-async def update_datashape(datashape_id: int, datashape_data: DatashapeCreate, database: Session = Depends(get_db)) -> Datashape:
+async def update_datashape(datashape_id: int, datashape_data: DatashapeCreate,
+                           database: Session = Depends(get_db)) -> Datashape:
     db_datashape = database.query(Datashape).filter(Datashape.id == datashape_id).first()
     if db_datashape is None:
         raise HTTPException(status_code=404, detail="Datashape not found")
@@ -6618,7 +6565,8 @@ async def update_datashape(datashape_id: int, datashape_data: DatashapeCreate, d
     f_date_ids = database.query(Feature.id).filter(Feature.date_id == db_datashape.id).all()
     response_data = {
         "datashape": db_datashape,
-        "f_features_ids": [x[0] for x in f_features_ids],        "dataset_1_ids": [x[0] for x in dataset_1_ids],        "f_date_ids": [x[0] for x in f_date_ids]    }
+        "f_features_ids": [x[0] for x in f_features_ids], "dataset_1_ids": [x[0] for x in dataset_1_ids],
+        "f_date_ids": [x[0] for x in f_date_ids]}
     return response_data
 
 
@@ -6632,33 +6580,17 @@ async def delete_datashape(datashape_id: int, database: Session = Depends(get_db
     return db_datashape
 
 
-
-
-
 ############################################
 #
 #   Dataset functions
 #
 ############################################
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
+
 
 @app.get("/dataset/", response_model=None, tags=["Dataset"])
 def get_all_dataset(detailed: bool = False, database: Session = Depends(get_db)) -> list:
     from sqlalchemy.orm import joinedload
-    
+
     # Use detailed=true to get entities with eagerly loaded relationships (for tables with lookup columns)
     if detailed:
         # Eagerly load all relationships to avoid N+1 queries
@@ -6666,13 +6598,13 @@ def get_all_dataset(detailed: bool = False, database: Session = Depends(get_db))
         query = query.options(joinedload(Dataset.datashape))
         query = query.options(joinedload(Dataset.project))
         dataset_list = query.all()
-        
+
         # Serialize with relationships included
         result = []
         for dataset_item in dataset_list:
             item_dict = dataset_item.__dict__.copy()
             item_dict.pop('_sa_instance_state', None)
-            
+
             # Add many-to-one relationships (foreign keys for lookup columns)
             if dataset_item.datashape:
                 related_obj = dataset_item.datashape
@@ -6688,15 +6620,19 @@ def get_all_dataset(detailed: bool = False, database: Session = Depends(get_db))
                 item_dict['project'] = related_dict
             else:
                 item_dict['project'] = None
-            
+
             # Add many-to-many and one-to-many relationship objects (full details)
-            evaluation_list = database.query(Evaluation).join(evaluates_eval, Evaluation.id == evaluates_eval.c.evalu).filter(evaluates_eval.c.evaluates == dataset_item.id).all()
+            evaluation_list = database.query(Evaluation).join(evaluates_eval,
+                                                              Evaluation.id == evaluates_eval.c.evalu).filter(
+                evaluates_eval.c.evaluates == dataset_item.id).all()
             item_dict['evalu'] = []
             for evaluation_obj in evaluation_list:
                 evaluation_dict = evaluation_obj.__dict__.copy()
                 evaluation_dict.pop('_sa_instance_state', None)
                 item_dict['evalu'].append(evaluation_dict)
-            evaluation_list = database.query(Evaluation).join(evaluation_element, Evaluation.id == evaluation_element.c.eval).filter(evaluation_element.c.ref == dataset_item.id).all()
+            evaluation_list = database.query(Evaluation).join(evaluation_element,
+                                                              Evaluation.id == evaluation_element.c.eval).filter(
+                evaluation_element.c.ref == dataset_item.id).all()
             item_dict['eval'] = []
             for evaluation_obj in evaluation_list:
                 evaluation_dict = evaluation_obj.__dict__.copy()
@@ -6726,7 +6662,7 @@ def get_all_dataset(detailed: bool = False, database: Session = Depends(get_db))
                 measure_dict = measure_obj.__dict__.copy()
                 measure_dict.pop('_sa_instance_state', None)
                 item_dict['measure'].append(measure_dict)
-            
+
             result.append(item_dict)
         return result
     else:
@@ -6742,7 +6678,8 @@ def get_count_dataset(database: Session = Depends(get_db)) -> dict:
 
 
 @app.get("/dataset/paginated/", response_model=None, tags=["Dataset"])
-def get_paginated_dataset(skip: int = 0, limit: int = 100, detailed: bool = False, database: Session = Depends(get_db)) -> dict:
+def get_paginated_dataset(skip: int = 0, limit: int = 100, detailed: bool = False,
+                          database: Session = Depends(get_db)) -> dict:
     """Get paginated list of Dataset entities"""
     total = database.query(Dataset).count()
     dataset_list = database.query(Dataset).offset(skip).limit(limit).all()
@@ -6755,11 +6692,13 @@ def get_paginated_dataset(skip: int = 0, limit: int = 100, detailed: bool = Fals
             "limit": limit,
             "data": dataset_list
         }
-    
+
     result = []
     for dataset_item in dataset_list:
-        evaluation_ids = database.query(evaluates_eval.c.evalu).filter(evaluates_eval.c.evaluates == dataset_item.id).all()
-        evaluation_ids = database.query(evaluation_element.c.eval).filter(evaluation_element.c.ref == dataset_item.id).all()
+        evaluation_ids = database.query(evaluates_eval.c.evalu).filter(
+            evaluates_eval.c.evaluates == dataset_item.id).all()
+        evaluation_ids = database.query(evaluation_element.c.eval).filter(
+            evaluation_element.c.ref == dataset_item.id).all()
         observation_2_ids = database.query(Observation.id).filter(Observation.dataset_id == dataset_item.id).all()
         models_ids = database.query(Model.id).filter(Model.dataset_id == dataset_item.id).all()
         measure_ids = database.query(Measure.id).filter(Measure.measurand_id == dataset_item.id).all()
@@ -6767,7 +6706,8 @@ def get_paginated_dataset(skip: int = 0, limit: int = 100, detailed: bool = Fals
             "dataset": dataset_item,
             "evaluation_ids": [x[0] for x in evaluation_ids],
             "evaluation_ids": [x[0] for x in evaluation_ids],
-            "observation_2_ids": [x[0] for x in observation_2_ids],            "models_ids": [x[0] for x in models_ids],            "measure_ids": [x[0] for x in measure_ids]        }
+            "observation_2_ids": [x[0] for x in observation_2_ids], "models_ids": [x[0] for x in models_ids],
+            "measure_ids": [x[0] for x in measure_ids]}
         result.append(item_data)
     return {
         "total": total,
@@ -6779,12 +6719,11 @@ def get_paginated_dataset(skip: int = 0, limit: int = 100, detailed: bool = Fals
 
 @app.get("/dataset/search/", response_model=None, tags=["Dataset"])
 def search_dataset(
-    database: Session = Depends(get_db)
+        database: Session = Depends(get_db)
 ) -> list:
     """Search Dataset entities by attributes"""
     query = database.query(Dataset)
-    
-    
+
     results = query.all()
     return results
 
@@ -6804,21 +6743,20 @@ async def get_dataset(dataset_id: int, database: Session = Depends(get_db)) -> D
         "dataset": db_dataset,
         "evaluation_ids": [x[0] for x in evaluation_ids],
         "evaluation_ids": [x[0] for x in evaluation_ids],
-        "observation_2_ids": [x[0] for x in observation_2_ids],        "models_ids": [x[0] for x in models_ids],        "measure_ids": [x[0] for x in measure_ids]}
+        "observation_2_ids": [x[0] for x in observation_2_ids], "models_ids": [x[0] for x in models_ids],
+        "measure_ids": [x[0] for x in measure_ids]}
     return response_data
-
 
 
 @app.post("/dataset/", response_model=None, tags=["Dataset"])
 async def create_dataset(dataset_data: DatasetCreate, database: Session = Depends(get_db)) -> Dataset:
-
     if dataset_data.datashape is not None:
         db_datashape = database.query(Datashape).filter(Datashape.id == dataset_data.datashape).first()
         if not db_datashape:
             raise HTTPException(status_code=400, detail="Datashape not found")
     else:
         raise HTTPException(status_code=400, detail="Datashape ID is required")
-    if dataset_data.project :
+    if dataset_data.project:
         db_project = database.query(Project).filter(Project.id == dataset_data.project).first()
         if not db_project:
             raise HTTPException(status_code=400, detail="Project not found")
@@ -6836,7 +6774,9 @@ async def create_dataset(dataset_data: DatasetCreate, database: Session = Depend
                 raise HTTPException(status_code=404, detail=f"Evaluation with ID {id} not found")
 
     db_dataset = Dataset(
-        licensing=dataset_data.licensing.value,        version=dataset_data.version,        source=dataset_data.source,        dataset_type=dataset_data.dataset_type.value,        datashape_id=dataset_data.datashape,        project_id=dataset_data.project        )
+        licensing=dataset_data.licensing.value, version=dataset_data.version, source=dataset_data.source,
+        dataset_type=dataset_data.dataset_type.value, datashape_id=dataset_data.datashape,
+        project_id=dataset_data.project)
 
     database.add(db_dataset)
     database.commit()
@@ -6860,7 +6800,7 @@ async def create_dataset(dataset_data: DatasetCreate, database: Session = Depend
             db_model = database.query(Model).filter(Model.id == model_id).first()
             if not db_model:
                 raise HTTPException(status_code=400, detail=f"Model with id {model_id} not found")
-        
+
         # Update the related entities with the new foreign key
         database.query(Model).filter(Model.id.in_(dataset_data.models)).update(
             {Model.dataset_id: db_dataset.id}, synchronize_session=False
@@ -6872,7 +6812,7 @@ async def create_dataset(dataset_data: DatasetCreate, database: Session = Depend
             db_observation = database.query(Observation).filter(Observation.id == observation_id).first()
             if not db_observation:
                 raise HTTPException(status_code=400, detail=f"Observation with id {observation_id} not found")
-        
+
         # Update the related entities with the new foreign key
         database.query(Observation).filter(Observation.id.in_(dataset_data.observation_2)).update(
             {Observation.dataset_id: db_dataset.id}, synchronize_session=False
@@ -6884,7 +6824,7 @@ async def create_dataset(dataset_data: DatasetCreate, database: Session = Depend
             db_measure = database.query(Measure).filter(Measure.id == measure_id).first()
             if not db_measure:
                 raise HTTPException(status_code=400, detail=f"Measure with id {measure_id} not found")
-        
+
         # Update the related entities with the new foreign key
         database.query(Measure).filter(Measure.id.in_(dataset_data.measure)).update(
             {Measure.measurand_id: db_dataset.id}, synchronize_session=False
@@ -6908,7 +6848,6 @@ async def create_dataset(dataset_data: DatasetCreate, database: Session = Depend
             database.execute(association)
             database.commit()
 
-    
     evaluation_ids = database.query(evaluates_eval.c.evalu).filter(evaluates_eval.c.evaluates == db_dataset.id).all()
     evaluation_ids = database.query(evaluation_element.c.eval).filter(evaluation_element.c.ref == db_dataset.id).all()
     observation_2_ids = database.query(Observation.id).filter(Observation.dataset_id == db_dataset.id).all()
@@ -6918,7 +6857,8 @@ async def create_dataset(dataset_data: DatasetCreate, database: Session = Depend
         "dataset": db_dataset,
         "evaluation_ids": [x[0] for x in evaluation_ids],
         "evaluation_ids": [x[0] for x in evaluation_ids],
-        "observation_2_ids": [x[0] for x in observation_2_ids],        "models_ids": [x[0] for x in models_ids],        "measure_ids": [x[0] for x in measure_ids]    }
+        "observation_2_ids": [x[0] for x in observation_2_ids], "models_ids": [x[0] for x in models_ids],
+        "measure_ids": [x[0] for x in measure_ids]}
     return response_data
 
 
@@ -6927,25 +6867,26 @@ async def bulk_create_dataset(items: list[DatasetCreate], database: Session = De
     """Create multiple Dataset entities at once"""
     created_items = []
     errors = []
-    
+
     for idx, item_data in enumerate(items):
         try:
             # Basic validation for each item
             if not item_data.datashape:
                 raise ValueError("Datashape ID is required")
-            
+
             db_dataset = Dataset(
-                licensing=item_data.licensing.value,                version=item_data.version,                source=item_data.source,                dataset_type=item_data.dataset_type.value,                datashape_id=item_data.datashape            )
+                licensing=item_data.licensing.value, version=item_data.version, source=item_data.source,
+                dataset_type=item_data.dataset_type.value, datashape_id=item_data.datashape)
             database.add(db_dataset)
             database.flush()  # Get ID without committing
             created_items.append(db_dataset.id)
         except Exception as e:
             errors.append({"index": idx, "error": str(e)})
-    
+
     if errors:
         database.rollback()
         raise HTTPException(status_code=400, detail={"message": "Bulk creation failed", "errors": errors})
-    
+
     database.commit()
     return {
         "created_count": len(created_items),
@@ -6959,7 +6900,7 @@ async def bulk_delete_dataset(ids: list[int], database: Session = Depends(get_db
     """Delete multiple Dataset entities at once"""
     deleted_count = 0
     not_found = []
-    
+
     for item_id in ids:
         db_dataset = database.query(Dataset).filter(Dataset.id == item_id).first()
         if db_dataset:
@@ -6967,14 +6908,15 @@ async def bulk_delete_dataset(ids: list[int], database: Session = Depends(get_db
             deleted_count += 1
         else:
             not_found.append(item_id)
-    
+
     database.commit()
-    
+
     return {
         "deleted_count": deleted_count,
         "not_found": not_found,
         "message": f"Successfully deleted {deleted_count} Dataset entities"
     }
+
 
 @app.put("/dataset/{dataset_id}/", response_model=None, tags=["Dataset"])
 async def update_dataset(dataset_id: int, dataset_data: DatasetCreate, database: Session = Depends(get_db)) -> Dataset:
@@ -7014,7 +6956,7 @@ async def update_dataset(dataset_id: int, dataset_data: DatasetCreate, database:
         database.query(Model).filter(Model.dataset_id == db_dataset.id).update(
             {Model.dataset_id: None}, synchronize_session=False
         )
-        
+
         # Set new relationships if list is not empty
         if dataset_data.models:
             # Validate that all IDs exist
@@ -7022,7 +6964,7 @@ async def update_dataset(dataset_id: int, dataset_data: DatasetCreate, database:
                 db_model = database.query(Model).filter(Model.id == model_id).first()
                 if not db_model:
                     raise HTTPException(status_code=400, detail=f"Model with id {model_id} not found")
-            
+
             # Update the related entities with the new foreign key
             database.query(Model).filter(Model.id.in_(dataset_data.models)).update(
                 {Model.dataset_id: db_dataset.id}, synchronize_session=False
@@ -7032,7 +6974,7 @@ async def update_dataset(dataset_id: int, dataset_data: DatasetCreate, database:
         database.query(Measure).filter(Measure.measurand_id == db_dataset.id).update(
             {Measure.measurand_id: None}, synchronize_session=False
         )
-        
+
         # Set new relationships if list is not empty
         if dataset_data.measure:
             # Validate that all IDs exist
@@ -7040,7 +6982,7 @@ async def update_dataset(dataset_id: int, dataset_data: DatasetCreate, database:
                 db_measure = database.query(Measure).filter(Measure.id == measure_id).first()
                 if not db_measure:
                     raise HTTPException(status_code=400, detail=f"Measure with id {measure_id} not found")
-            
+
             # Update the related entities with the new foreign key
             database.query(Measure).filter(Measure.id.in_(dataset_data.measure)).update(
                 {Measure.measurand_id: db_dataset.id}, synchronize_session=False
@@ -7063,7 +7005,7 @@ async def update_dataset(dataset_id: int, dataset_data: DatasetCreate, database:
         database.execute(association)
     existing_evaluation_ids = [assoc.eval for assoc in database.execute(
         evaluation_element.select().where(evaluation_element.c.ref == db_dataset.id))]
-    
+
     evaluations_to_remove = set(existing_evaluation_ids) - set(dataset_data.eval)
     for evaluation_id in evaluations_to_remove:
         association = evaluation_element.delete().where(
@@ -7079,7 +7021,7 @@ async def update_dataset(dataset_id: int, dataset_data: DatasetCreate, database:
         database.execute(association)
     database.commit()
     database.refresh(db_dataset)
-    
+
     evaluation_ids = database.query(evaluates_eval.c.evalu).filter(evaluates_eval.c.evaluates == db_dataset.id).all()
     evaluation_ids = database.query(evaluation_element.c.eval).filter(evaluation_element.c.ref == db_dataset.id).all()
     observation_2_ids = database.query(Observation.id).filter(Observation.dataset_id == db_dataset.id).all()
@@ -7089,7 +7031,8 @@ async def update_dataset(dataset_id: int, dataset_data: DatasetCreate, database:
         "dataset": db_dataset,
         "evaluation_ids": [x[0] for x in evaluation_ids],
         "evaluation_ids": [x[0] for x in evaluation_ids],
-        "observation_2_ids": [x[0] for x in observation_2_ids],        "models_ids": [x[0] for x in models_ids],        "measure_ids": [x[0] for x in measure_ids]    }
+        "observation_2_ids": [x[0] for x in observation_2_ids], "models_ids": [x[0] for x in models_ids],
+        "measure_ids": [x[0] for x in measure_ids]}
     return response_data
 
 
@@ -7102,31 +7045,32 @@ async def delete_dataset(dataset_id: int, database: Session = Depends(get_db)):
     database.commit()
     return db_dataset
 
+
 @app.post("/dataset/{dataset_id}/evalu/{evaluation_id}/", response_model=None, tags=["Dataset Relationships"])
 async def add_evalu_to_dataset(dataset_id: int, evaluation_id: int, database: Session = Depends(get_db)):
     """Add a Evaluation to this Dataset's evalu relationship"""
     db_dataset = database.query(Dataset).filter(Dataset.id == dataset_id).first()
     if db_dataset is None:
         raise HTTPException(status_code=404, detail="Dataset not found")
-    
+
     db_evaluation = database.query(Evaluation).filter(Evaluation.id == evaluation_id).first()
     if db_evaluation is None:
         raise HTTPException(status_code=404, detail="Evaluation not found")
-    
+
     # Check if relationship already exists
     existing = database.query(evaluates_eval).filter(
         (evaluates_eval.c.evaluates == dataset_id) &
         (evaluates_eval.c.evalu == evaluation_id)
     ).first()
-    
+
     if existing:
         raise HTTPException(status_code=400, detail="Relationship already exists")
-    
+
     # Create the association
     association = evaluates_eval.insert().values(evaluates=dataset_id, evalu=evaluation_id)
     database.execute(association)
     database.commit()
-    
+
     return {"message": "Evaluation added to evalu successfully"}
 
 
@@ -7136,24 +7080,24 @@ async def remove_evalu_from_dataset(dataset_id: int, evaluation_id: int, databas
     db_dataset = database.query(Dataset).filter(Dataset.id == dataset_id).first()
     if db_dataset is None:
         raise HTTPException(status_code=404, detail="Dataset not found")
-    
+
     # Check if relationship exists
     existing = database.query(evaluates_eval).filter(
         (evaluates_eval.c.evaluates == dataset_id) &
         (evaluates_eval.c.evalu == evaluation_id)
     ).first()
-    
+
     if not existing:
         raise HTTPException(status_code=404, detail="Relationship not found")
-    
+
     # Delete the association
     association = evaluation_element.delete().where(
-        (evaluation_element.c.ref == dataset_id) & 
+        (evaluation_element.c.ref == dataset_id) &
         (evaluation_element.c.eval == evaluation_id)
     )
     database.execute(association)
     database.commit()
-    
+
     return {"message": "Evaluation removed from evalu successfully"}
 
 
@@ -7163,15 +7107,16 @@ async def get_evalu_of_dataset(dataset_id: int, database: Session = Depends(get_
     db_dataset = database.query(Dataset).filter(Dataset.id == dataset_id).first()
     if db_dataset is None:
         raise HTTPException(status_code=404, detail="Dataset not found")
-    
+
     evaluation_ids = database.query(evaluates_eval.c.evalu).filter(evaluates_eval.c.evaluates == dataset_id).all()
     evaluation_list = database.query(Evaluation).filter(Evaluation.id.in_([id[0] for id in evaluation_ids])).all()
-    
+
     return {
         "dataset_id": dataset_id,
         "evalu_count": len(evaluation_list),
         "evalu": evaluation_list
     }
+
 
 @app.post("/dataset/{dataset_id}/eval/{evaluation_id}/", response_model=None, tags=["Dataset Relationships"])
 async def add_eval_to_dataset(dataset_id: int, evaluation_id: int, database: Session = Depends(get_db)):
@@ -7179,25 +7124,25 @@ async def add_eval_to_dataset(dataset_id: int, evaluation_id: int, database: Ses
     db_dataset = database.query(Dataset).filter(Dataset.id == dataset_id).first()
     if db_dataset is None:
         raise HTTPException(status_code=404, detail="Dataset not found")
-    
+
     db_evaluation = database.query(Evaluation).filter(Evaluation.id == evaluation_id).first()
     if db_evaluation is None:
         raise HTTPException(status_code=404, detail="Evaluation not found")
-    
+
     # Check if relationship already exists
     existing = database.query(evaluation_element).filter(
         (evaluation_element.c.ref == dataset_id) &
         (evaluation_element.c.eval == evaluation_id)
     ).first()
-    
+
     if existing:
         raise HTTPException(status_code=400, detail="Relationship already exists")
-    
+
     # Create the association
     association = evaluation_element.insert().values(ref=dataset_id, eval=evaluation_id)
     database.execute(association)
     database.commit()
-    
+
     return {"message": "Evaluation added to eval successfully"}
 
 
@@ -7207,16 +7152,16 @@ async def remove_eval_from_dataset(dataset_id: int, evaluation_id: int, database
     db_dataset = database.query(Dataset).filter(Dataset.id == dataset_id).first()
     if db_dataset is None:
         raise HTTPException(status_code=404, detail="Dataset not found")
-    
+
     # Check if relationship exists
     existing = database.query(evaluation_element).filter(
         (evaluation_element.c.ref == dataset_id) &
         (evaluation_element.c.eval == evaluation_id)
     ).first()
-    
+
     if not existing:
         raise HTTPException(status_code=404, detail="Relationship not found")
-    
+
     # Delete the association
     association = evaluation_element.delete().where(
         (evaluation_element.c.ref == dataset_id) &
@@ -7224,7 +7169,7 @@ async def remove_eval_from_dataset(dataset_id: int, evaluation_id: int, database
     )
     database.execute(association)
     database.commit()
-    
+
     return {"message": "Evaluation removed from eval successfully"}
 
 
@@ -7234,10 +7179,10 @@ async def get_eval_of_dataset(dataset_id: int, database: Session = Depends(get_d
     db_dataset = database.query(Dataset).filter(Dataset.id == dataset_id).first()
     if db_dataset is None:
         raise HTTPException(status_code=404, detail="Dataset not found")
-    
+
     evaluation_ids = database.query(evaluation_element.c.eval).filter(evaluation_element.c.ref == dataset_id).all()
     evaluation_list = database.query(Evaluation).filter(Evaluation.id.in_([id[0] for id in evaluation_ids])).all()
-    
+
     return {
         "dataset_id": dataset_id,
         "eval_count": len(evaluation_list),
@@ -7245,41 +7190,34 @@ async def get_eval_of_dataset(dataset_id: int, database: Session = Depends(get_d
     }
 
 
-
-
-
 ############################################
 #
 #   Project functions
 #
 ############################################
- 
- 
- 
- 
-
 
 
 @app.get("/project/", response_model=None, tags=["Project"])
 def get_all_project(detailed: bool = False, database: Session = Depends(get_db)) -> list:
     from sqlalchemy.orm import joinedload
-    
+
     # Use detailed=true to get entities with eagerly loaded relationships (for tables with lookup columns)
     if detailed:
         # Eagerly load all relationships to avoid N+1 queries
         query = database.query(Project)
         project_list = query.all()
-        
+
         # Serialize with relationships included
         result = []
         for project_item in project_list:
             item_dict = project_item.__dict__.copy()
             item_dict.pop('_sa_instance_state', None)
-            
+
             # Add many-to-one relationships (foreign keys for lookup columns)
-            
+
             # Add many-to-many and one-to-many relationship objects (full details)
-            legalrequirement_list = database.query(LegalRequirement).filter(LegalRequirement.project_1_id == project_item.id).all()
+            legalrequirement_list = database.query(LegalRequirement).filter(
+                LegalRequirement.project_1_id == project_item.id).all()
             item_dict['legal_requirements'] = []
             for legalrequirement_obj in legalrequirement_list:
                 legalrequirement_dict = legalrequirement_obj.__dict__.copy()
@@ -7297,7 +7235,7 @@ def get_all_project(detailed: bool = False, database: Session = Depends(get_db))
                 evaluation_dict = evaluation_obj.__dict__.copy()
                 evaluation_dict.pop('_sa_instance_state', None)
                 item_dict['eval'].append(evaluation_dict)
-            
+
             result.append(item_dict)
         return result
     else:
@@ -7313,7 +7251,8 @@ def get_count_project(database: Session = Depends(get_db)) -> dict:
 
 
 @app.get("/project/paginated/", response_model=None, tags=["Project"])
-def get_paginated_project(skip: int = 0, limit: int = 100, detailed: bool = False, database: Session = Depends(get_db)) -> dict:
+def get_paginated_project(skip: int = 0, limit: int = 100, detailed: bool = False,
+                          database: Session = Depends(get_db)) -> dict:
     """Get paginated list of Project entities"""
     total = database.query(Project).count()
     project_list = database.query(Project).offset(skip).limit(limit).all()
@@ -7326,15 +7265,17 @@ def get_paginated_project(skip: int = 0, limit: int = 100, detailed: bool = Fals
             "limit": limit,
             "data": project_list
         }
-    
+
     result = []
     for project_item in project_list:
-        legal_requirements_ids = database.query(LegalRequirement.id).filter(LegalRequirement.project_1_id == project_item.id).all()
+        legal_requirements_ids = database.query(LegalRequirement.id).filter(
+            LegalRequirement.project_1_id == project_item.id).all()
         involves_ids = database.query(Element.id).filter(Element.project_id == project_item.id).all()
         eval_ids = database.query(Evaluation.id).filter(Evaluation.project_id == project_item.id).all()
         item_data = {
             "project": project_item,
-            "legal_requirements_ids": [x[0] for x in legal_requirements_ids],            "involves_ids": [x[0] for x in involves_ids],            "eval_ids": [x[0] for x in eval_ids]        }
+            "legal_requirements_ids": [x[0] for x in legal_requirements_ids],
+            "involves_ids": [x[0] for x in involves_ids], "eval_ids": [x[0] for x in eval_ids]}
         result.append(item_data)
     return {
         "total": total,
@@ -7346,12 +7287,11 @@ def get_paginated_project(skip: int = 0, limit: int = 100, detailed: bool = Fals
 
 @app.get("/project/search/", response_model=None, tags=["Project"])
 def search_project(
-    database: Session = Depends(get_db)
+        database: Session = Depends(get_db)
 ) -> list:
     """Search Project entities by attributes"""
     query = database.query(Project)
-    
-    
+
     results = query.all()
     return results
 
@@ -7362,22 +7302,21 @@ async def get_project(project_id: int, database: Session = Depends(get_db)) -> P
     if db_project is None:
         raise HTTPException(status_code=404, detail="Project not found")
 
-    legal_requirements_ids = database.query(LegalRequirement.id).filter(LegalRequirement.project_1_id == db_project.id).all()
+    legal_requirements_ids = database.query(LegalRequirement.id).filter(
+        LegalRequirement.project_1_id == db_project.id).all()
     involves_ids = database.query(Element.id).filter(Element.project_id == db_project.id).all()
     eval_ids = database.query(Evaluation.id).filter(Evaluation.project_id == db_project.id).all()
     response_data = {
         "project": db_project,
-        "legal_requirements_ids": [x[0] for x in legal_requirements_ids],        "involves_ids": [x[0] for x in involves_ids],        "eval_ids": [x[0] for x in eval_ids]}
+        "legal_requirements_ids": [x[0] for x in legal_requirements_ids], "involves_ids": [x[0] for x in involves_ids],
+        "eval_ids": [x[0] for x in eval_ids]}
     return response_data
-
 
 
 @app.post("/project/", response_model=None, tags=["Project"])
 async def create_project(project_data: ProjectCreate, database: Session = Depends(get_db)) -> Project:
-
-
     db_project = Project(
-        status=project_data.status.value,        name=project_data.name        )
+        status=project_data.status.value, name=project_data.name)
 
     database.add(db_project)
     database.commit()
@@ -7386,10 +7325,11 @@ async def create_project(project_data: ProjectCreate, database: Session = Depend
     if project_data.legal_requirements:
         # Validate that all LegalRequirement IDs exist
         for legalrequirement_id in project_data.legal_requirements:
-            db_legalrequirement = database.query(LegalRequirement).filter(LegalRequirement.id == legalrequirement_id).first()
+            db_legalrequirement = database.query(LegalRequirement).filter(
+                LegalRequirement.id == legalrequirement_id).first()
             if not db_legalrequirement:
                 raise HTTPException(status_code=400, detail=f"LegalRequirement with id {legalrequirement_id} not found")
-        
+
         # Update the related entities with the new foreign key
         database.query(LegalRequirement).filter(LegalRequirement.id.in_(project_data.legal_requirements)).update(
             {LegalRequirement.project_1_id: db_project.id}, synchronize_session=False
@@ -7413,21 +7353,21 @@ async def create_project(project_data: ProjectCreate, database: Session = Depend
             db_evaluation = database.query(Evaluation).filter(Evaluation.id == evaluation_id).first()
             if not db_evaluation:
                 raise HTTPException(status_code=400, detail=f"Evaluation with id {evaluation_id} not found")
-        
+
         # Update the related entities with the new foreign key
         database.query(Evaluation).filter(Evaluation.id.in_(project_data.eval)).update(
             {Evaluation.project_id: db_project.id}, synchronize_session=False
         )
         database.commit()
 
-
-    
-    legal_requirements_ids = database.query(LegalRequirement.id).filter(LegalRequirement.project_1_id == db_project.id).all()
+    legal_requirements_ids = database.query(LegalRequirement.id).filter(
+        LegalRequirement.project_1_id == db_project.id).all()
     involves_ids = database.query(Element.id).filter(Element.project_id == db_project.id).all()
     eval_ids = database.query(Evaluation.id).filter(Evaluation.project_id == db_project.id).all()
     response_data = {
         "project": db_project,
-        "legal_requirements_ids": [x[0] for x in legal_requirements_ids],        "involves_ids": [x[0] for x in involves_ids],        "eval_ids": [x[0] for x in eval_ids]    }
+        "legal_requirements_ids": [x[0] for x in legal_requirements_ids], "involves_ids": [x[0] for x in involves_ids],
+        "eval_ids": [x[0] for x in eval_ids]}
     return response_data
 
 
@@ -7436,23 +7376,23 @@ async def bulk_create_project(items: list[ProjectCreate], database: Session = De
     """Create multiple Project entities at once"""
     created_items = []
     errors = []
-    
+
     for idx, item_data in enumerate(items):
         try:
             # Basic validation for each item
-            
+
             db_project = Project(
-                status=item_data.status.value,                name=item_data.name            )
+                status=item_data.status.value, name=item_data.name)
             database.add(db_project)
             database.flush()  # Get ID without committing
             created_items.append(db_project.id)
         except Exception as e:
             errors.append({"index": idx, "error": str(e)})
-    
+
     if errors:
         database.rollback()
         raise HTTPException(status_code=400, detail={"message": "Bulk creation failed", "errors": errors})
-    
+
     database.commit()
     return {
         "created_count": len(created_items),
@@ -7466,7 +7406,7 @@ async def bulk_delete_project(ids: list[int], database: Session = Depends(get_db
     """Delete multiple Project entities at once"""
     deleted_count = 0
     not_found = []
-    
+
     for item_id in ids:
         db_project = database.query(Project).filter(Project.id == item_id).first()
         if db_project:
@@ -7474,14 +7414,15 @@ async def bulk_delete_project(ids: list[int], database: Session = Depends(get_db
             deleted_count += 1
         else:
             not_found.append(item_id)
-    
+
     database.commit()
-    
+
     return {
         "deleted_count": deleted_count,
         "not_found": not_found,
         "message": f"Successfully deleted {deleted_count} Project entities"
     }
+
 
 @app.put("/project/{project_id}/", response_model=None, tags=["Project"])
 async def update_project(project_id: int, project_data: ProjectCreate, database: Session = Depends(get_db)) -> Project:
@@ -7501,9 +7442,11 @@ async def update_project(project_id: int, project_data: ProjectCreate, database:
         if project_data.legal_requirements:
             # Validate that all IDs exist
             for legalrequirement_id in project_data.legal_requirements:
-                db_legalrequirement = database.query(LegalRequirement).filter(LegalRequirement.id == legalrequirement_id).first()
+                db_legalrequirement = database.query(LegalRequirement).filter(
+                    LegalRequirement.id == legalrequirement_id).first()
                 if not db_legalrequirement:
-                    raise HTTPException(status_code=400, detail=f"LegalRequirement with id {legalrequirement_id} not found")
+                    raise HTTPException(status_code=400,
+                                        detail=f"LegalRequirement with id {legalrequirement_id} not found")
 
             # Update the related entities with the new foreign key
             database.query(LegalRequirement).filter(LegalRequirement.id.in_(project_data.legal_requirements)).update(
@@ -7514,7 +7457,7 @@ async def update_project(project_id: int, project_data: ProjectCreate, database:
         database.query(Element).filter(Element.project_id == db_project.id).update(
             {Element.project_id: None}, synchronize_session=False
         )
-        
+
         # Set new relationships if list is not empty
         if project_data.involves:
             # Validate that all IDs exist
@@ -7522,7 +7465,7 @@ async def update_project(project_id: int, project_data: ProjectCreate, database:
                 db_element = database.query(Element).filter(Element.id == element_id).first()
                 if not db_element:
                     raise HTTPException(status_code=400, detail=f"Element with id {element_id} not found")
-            
+
             # Update the related entities with the new foreign key
             database.query(Element).filter(Element.id.in_(project_data.involves)).update(
                 {Element.project_id: db_project.id}, synchronize_session=False
@@ -7532,7 +7475,7 @@ async def update_project(project_id: int, project_data: ProjectCreate, database:
         database.query(Evaluation).filter(Evaluation.project_id == db_project.id).update(
             {Evaluation.project_id: None}, synchronize_session=False
         )
-        
+
         # Set new relationships if list is not empty
         if project_data.eval:
             # Validate that all IDs exist
@@ -7540,20 +7483,22 @@ async def update_project(project_id: int, project_data: ProjectCreate, database:
                 db_evaluation = database.query(Evaluation).filter(Evaluation.id == evaluation_id).first()
                 if not db_evaluation:
                     raise HTTPException(status_code=400, detail=f"Evaluation with id {evaluation_id} not found")
-            
+
             # Update the related entities with the new foreign key
             database.query(Evaluation).filter(Evaluation.id.in_(project_data.eval)).update(
                 {Evaluation.project_id: db_project.id}, synchronize_session=False
             )
     database.commit()
     database.refresh(db_project)
-    
-    legal_requirements_ids = database.query(LegalRequirement.id).filter(LegalRequirement.project_1_id == db_project.id).all()
+
+    legal_requirements_ids = database.query(LegalRequirement.id).filter(
+        LegalRequirement.project_1_id == db_project.id).all()
     involves_ids = database.query(Element.id).filter(Element.project_id == db_project.id).all()
     eval_ids = database.query(Evaluation.id).filter(Evaluation.project_id == db_project.id).all()
     response_data = {
         "project": db_project,
-        "legal_requirements_ids": [x[0] for x in legal_requirements_ids],        "involves_ids": [x[0] for x in involves_ids],        "eval_ids": [x[0] for x in eval_ids]    }
+        "legal_requirements_ids": [x[0] for x in legal_requirements_ids], "involves_ids": [x[0] for x in involves_ids],
+        "eval_ids": [x[0] for x in eval_ids]}
     return response_data
 
 
@@ -7567,29 +7512,17 @@ async def delete_project(project_id: int, database: Session = Depends(get_db)):
     return db_project
 
 
-
-
-
 ############################################
 #
 #   Model functions
 #
 ############################################
- 
- 
- 
- 
- 
- 
-
-
-
 
 
 @app.get("/model/", response_model=None, tags=["Model"])
 def get_all_model(detailed: bool = False, database: Session = Depends(get_db)) -> list:
     from sqlalchemy.orm import joinedload
-    
+
     # Use detailed=true to get entities with eagerly loaded relationships (for tables with lookup columns)
     if detailed:
         # Eagerly load all relationships to avoid N+1 queries
@@ -7597,13 +7530,13 @@ def get_all_model(detailed: bool = False, database: Session = Depends(get_db)) -
         query = query.options(joinedload(Model.dataset))
         query = query.options(joinedload(Model.project))
         model_list = query.all()
-        
+
         # Serialize with relationships included
         result = []
         for model_item in model_list:
             item_dict = model_item.__dict__.copy()
             item_dict.pop('_sa_instance_state', None)
-            
+
             # Add many-to-one relationships (foreign keys for lookup columns)
             if model_item.dataset:
                 related_obj = model_item.dataset
@@ -7621,13 +7554,17 @@ def get_all_model(detailed: bool = False, database: Session = Depends(get_db)) -
                 item_dict['project'] = None
 
             # Add many-to-many and one-to-many relationship objects (full details)
-            evaluation_list = database.query(Evaluation).join(evaluates_eval, Evaluation.id == evaluates_eval.c.evalu).filter(evaluates_eval.c.evaluates == model_item.id).all()
+            evaluation_list = database.query(Evaluation).join(evaluates_eval,
+                                                              Evaluation.id == evaluates_eval.c.evalu).filter(
+                evaluates_eval.c.evaluates == model_item.id).all()
             item_dict['evalu'] = []
             for evaluation_obj in evaluation_list:
                 evaluation_dict = evaluation_obj.__dict__.copy()
                 evaluation_dict.pop('_sa_instance_state', None)
                 item_dict['evalu'].append(evaluation_dict)
-            evaluation_list = database.query(Evaluation).join(evaluation_element, Evaluation.id == evaluation_element.c.eval).filter(evaluation_element.c.ref == model_item.id).all()
+            evaluation_list = database.query(Evaluation).join(evaluation_element,
+                                                              Evaluation.id == evaluation_element.c.eval).filter(
+                evaluation_element.c.ref == model_item.id).all()
             item_dict['eval'] = []
             for evaluation_obj in evaluation_list:
                 evaluation_dict = evaluation_obj.__dict__.copy()
@@ -7639,17 +7576,19 @@ def get_all_model(detailed: bool = False, database: Session = Depends(get_db)) -
                 measure_dict = measure_obj.__dict__.copy()
                 measure_dict.pop('_sa_instance_state', None)
                 item_dict['measure'].append(measure_dict)
-            
+
             result.append(item_dict)
         return result
     else:
         # Default: return flat entities (faster for charts/widgets without lookup columns)
         return database.query(Model).all()
 
+
 # PSA
 import logging
 
 logger = logging.getLogger("api")
+
 
 @app.get("/model_debug/", tags=["Model"])
 def get_all_model_debug(detailed: bool = False, database: Session = Depends(get_db)):
@@ -7659,10 +7598,13 @@ def get_all_model_debug(detailed: bool = False, database: Session = Depends(get_
     except Exception as e:
         logger.exception("ERROR in /model/ endpoint")
         raise HTTPException(status_code=500, detail=str(e))
-    
+
+
 # PSA
 from sqlalchemy import text
 from typing import Dict, Any, List
+
+
 # @app.get("/model_count_4_card/", tags=["Model"], response_model=List[Dict[str, Any]])
 # def model_count_4_card(database: Session = Depends(get_db)) -> List[Dict[str, Any]]:
 #     row = database.execute(
@@ -7683,22 +7625,20 @@ from typing import Dict, Any, List
 def model_count_4_card(database: Session = Depends(get_db)) -> List[Dict[str, Any]]:
     row = database.execute(
         text("""
-            SELECT
-              -- model table counts
-              (SELECT COUNT(*) FROM model) AS total_rows,
-              (SELECT COUNT(DISTINCT pid) FROM model) AS unique_pid,
-              (SELECT COUNT(DISTINCT source) FROM model) AS unique_source,
-              (SELECT COUNT(*) FROM model WHERE licensing = 'Open_Source') AS open_source_count,
-              (SELECT COUNT(*) FROM model WHERE licensing = 'Proprietary') AS proprietary_count,
+             SELECT
+                 -- model table counts
+                 (SELECT COUNT(*) FROM model)                                 AS total_rows,
+                 (SELECT COUNT(DISTINCT pid) FROM model)                      AS unique_pid,
+                 (SELECT COUNT(DISTINCT source) FROM model)                   AS unique_source,
+                 (SELECT COUNT(*) FROM model WHERE licensing = 'Open_Source') AS open_source_count,
+                 (SELECT COUNT(*) FROM model WHERE licensing = 'Proprietary') AS proprietary_count,
 
-              -- metric table counts
-              (SELECT COUNT(DISTINCT name) FROM metric) AS unique_metric_name
-        """)
+                 -- metric table counts
+                 (SELECT COUNT(DISTINCT name) FROM metric)                    AS unique_metric_name
+             """)
     ).mappings().one()
 
     return [dict(row)]
-
-
 
 
 @app.get("/model/count/", response_model=None, tags=["Model"])
@@ -7709,7 +7649,8 @@ def get_count_model(database: Session = Depends(get_db)) -> dict:
 
 
 @app.get("/model/paginated/", response_model=None, tags=["Model"])
-def get_paginated_model(skip: int = 0, limit: int = 100, detailed: bool = False, database: Session = Depends(get_db)) -> dict:
+def get_paginated_model(skip: int = 0, limit: int = 100, detailed: bool = False,
+                        database: Session = Depends(get_db)) -> dict:
     """Get paginated list of Model entities"""
     total = database.query(Model).count()
     model_list = database.query(Model).offset(skip).limit(limit).all()
@@ -7722,17 +7663,19 @@ def get_paginated_model(skip: int = 0, limit: int = 100, detailed: bool = False,
             "limit": limit,
             "data": model_list
         }
-    
+
     result = []
     for model_item in model_list:
-        evaluation_ids = database.query(evaluates_eval.c.evalu).filter(evaluates_eval.c.evaluates == model_item.id).all()
-        evaluation_ids = database.query(evaluation_element.c.eval).filter(evaluation_element.c.ref == model_item.id).all()
+        evaluation_ids = database.query(evaluates_eval.c.evalu).filter(
+            evaluates_eval.c.evaluates == model_item.id).all()
+        evaluation_ids = database.query(evaluation_element.c.eval).filter(
+            evaluation_element.c.ref == model_item.id).all()
         measure_ids = database.query(Measure.id).filter(Measure.measurand_id == model_item.id).all()
         item_data = {
             "model": model_item,
             "evaluation_ids": [x[0] for x in evaluation_ids],
             "evaluation_ids": [x[0] for x in evaluation_ids],
-            "measure_ids": [x[0] for x in measure_ids]        }
+            "measure_ids": [x[0] for x in measure_ids]}
         result.append(item_data)
     return {
         "total": total,
@@ -7744,12 +7687,11 @@ def get_paginated_model(skip: int = 0, limit: int = 100, detailed: bool = False,
 
 @app.get("/model/search/", response_model=None, tags=["Model"])
 def search_model(
-    database: Session = Depends(get_db)
+        database: Session = Depends(get_db)
 ) -> list:
     """Search Model entities by attributes"""
     query = database.query(Model)
-    
-    
+
     results = query.all()
     return results
 
@@ -7771,17 +7713,15 @@ async def get_model(model_id: int, database: Session = Depends(get_db)) -> Model
     return response_data
 
 
-
 @app.post("/model/", response_model=None, tags=["Model"])
 async def create_model(model_data: ModelCreate, database: Session = Depends(get_db)) -> Model:
-
     if model_data.dataset is not None:
         db_dataset = database.query(Dataset).filter(Dataset.id == model_data.dataset).first()
         if not db_dataset:
             raise HTTPException(status_code=400, detail="Dataset not found")
     else:
         raise HTTPException(status_code=400, detail="Dataset ID is required")
-    if model_data.project :
+    if model_data.project:
         db_project = database.query(Project).filter(Project.id == model_data.project).first()
         if not db_project:
             raise HTTPException(status_code=400, detail="Project not found")
@@ -7799,7 +7739,8 @@ async def create_model(model_data: ModelCreate, database: Session = Depends(get_
                 raise HTTPException(status_code=404, detail=f"Evaluation with ID {id} not found")
 
     db_model = Model(
-        data=model_data.data,        source=model_data.source,        pid=model_data.pid,        licensing=model_data.licensing.value,        dataset_id=model_data.dataset,        project_id=model_data.project        )
+        data=model_data.data, source=model_data.source, pid=model_data.pid, licensing=model_data.licensing.value,
+        dataset_id=model_data.dataset, project_id=model_data.project)
 
     database.add(db_model)
     database.commit()
@@ -7811,7 +7752,7 @@ async def create_model(model_data: ModelCreate, database: Session = Depends(get_
             db_measure = database.query(Measure).filter(Measure.id == measure_id).first()
             if not db_measure:
                 raise HTTPException(status_code=400, detail=f"Measure with id {measure_id} not found")
-        
+
         # Update the related entities with the new foreign key
         database.query(Measure).filter(Measure.id.in_(model_data.measure)).update(
             {Measure.measurand_id: db_model.id}, synchronize_session=False
@@ -7835,7 +7776,6 @@ async def create_model(model_data: ModelCreate, database: Session = Depends(get_
             database.execute(association)
             database.commit()
 
-    
     evaluation_ids = database.query(evaluates_eval.c.evalu).filter(evaluates_eval.c.evaluates == db_model.id).all()
     evaluation_ids = database.query(evaluation_element.c.eval).filter(evaluation_element.c.ref == db_model.id).all()
     measure_ids = database.query(Measure.id).filter(Measure.measurand_id == db_model.id).all()
@@ -7843,7 +7783,7 @@ async def create_model(model_data: ModelCreate, database: Session = Depends(get_
         "model": db_model,
         "evaluation_ids": [x[0] for x in evaluation_ids],
         "evaluation_ids": [x[0] for x in evaluation_ids],
-        "measure_ids": [x[0] for x in measure_ids]    }
+        "measure_ids": [x[0] for x in measure_ids]}
     return response_data
 
 
@@ -7852,7 +7792,7 @@ async def bulk_create_model(items: list[ModelCreate], database: Session = Depend
     """Create multiple Model entities at once"""
     created_items = []
     errors = []
-    
+
     for idx, item_data in enumerate(items):
         try:
             # Basic validation for each item
@@ -7860,17 +7800,18 @@ async def bulk_create_model(items: list[ModelCreate], database: Session = Depend
                 raise ValueError("Dataset ID is required")
 
             db_model = Model(
-                data=item_data.data,                source=item_data.source,                pid=item_data.pid,                licensing=item_data.licensing.value,                dataset_id=item_data.dataset            )
+                data=item_data.data, source=item_data.source, pid=item_data.pid, licensing=item_data.licensing.value,
+                dataset_id=item_data.dataset)
             database.add(db_model)
             database.flush()  # Get ID without committing
             created_items.append(db_model.id)
         except Exception as e:
             errors.append({"index": idx, "error": str(e)})
-    
+
     if errors:
         database.rollback()
         raise HTTPException(status_code=400, detail={"message": "Bulk creation failed", "errors": errors})
-    
+
     database.commit()
     return {
         "created_count": len(created_items),
@@ -7884,7 +7825,7 @@ async def bulk_delete_model(ids: list[int], database: Session = Depends(get_db))
     """Delete multiple Model entities at once"""
     deleted_count = 0
     not_found = []
-    
+
     for item_id in ids:
         db_model = database.query(Model).filter(Model.id == item_id).first()
         if db_model:
@@ -7892,14 +7833,15 @@ async def bulk_delete_model(ids: list[int], database: Session = Depends(get_db))
             deleted_count += 1
         else:
             not_found.append(item_id)
-    
+
     database.commit()
-    
+
     return {
         "deleted_count": deleted_count,
         "not_found": not_found,
         "message": f"Successfully deleted {deleted_count} Model entities"
     }
+
 
 @app.put("/model/{model_id}/", response_model=None, tags=["Model"])
 async def update_model(model_id: int, model_data: ModelCreate, database: Session = Depends(get_db)) -> Model:
@@ -7921,7 +7863,7 @@ async def update_model(model_id: int, model_data: ModelCreate, database: Session
         database.query(Measure).filter(Measure.measurand_id == db_model.id).update(
             {Measure.measurand_id: None}, synchronize_session=False
         )
-        
+
         # Set new relationships if list is not empty
         if model_data.measure:
             # Validate that all IDs exist
@@ -7929,14 +7871,14 @@ async def update_model(model_id: int, model_data: ModelCreate, database: Session
                 db_measure = database.query(Measure).filter(Measure.id == measure_id).first()
                 if not db_measure:
                     raise HTTPException(status_code=400, detail=f"Measure with id {measure_id} not found")
-            
+
             # Update the related entities with the new foreign key
             database.query(Measure).filter(Measure.id.in_(model_data.measure)).update(
                 {Measure.measurand_id: db_model.id}, synchronize_session=False
             )
     existing_evaluation_ids = [assoc.evalu for assoc in database.execute(
         evaluates_eval.select().where(evaluates_eval.c.evaluates == db_model.id))]
-    
+
     evaluations_to_remove = set(existing_evaluation_ids) - set(model_data.evalu)
     for evaluation_id in evaluations_to_remove:
         association = evaluates_eval.delete().where(
@@ -7952,7 +7894,7 @@ async def update_model(model_id: int, model_data: ModelCreate, database: Session
         database.execute(association)
     existing_evaluation_ids = [assoc.eval for assoc in database.execute(
         evaluation_element.select().where(evaluation_element.c.ref == db_model.id))]
-    
+
     evaluations_to_remove = set(existing_evaluation_ids) - set(model_data.eval)
     for evaluation_id in evaluations_to_remove:
         association = evaluation_element.delete().where(
@@ -7968,7 +7910,7 @@ async def update_model(model_id: int, model_data: ModelCreate, database: Session
         database.execute(association)
     database.commit()
     database.refresh(db_model)
-    
+
     evaluation_ids = database.query(evaluates_eval.c.evalu).filter(evaluates_eval.c.evaluates == db_model.id).all()
     evaluation_ids = database.query(evaluation_element.c.eval).filter(evaluation_element.c.ref == db_model.id).all()
     measure_ids = database.query(Measure.id).filter(Measure.measurand_id == db_model.id).all()
@@ -7976,7 +7918,7 @@ async def update_model(model_id: int, model_data: ModelCreate, database: Session
         "model": db_model,
         "evaluation_ids": [x[0] for x in evaluation_ids],
         "evaluation_ids": [x[0] for x in evaluation_ids],
-        "measure_ids": [x[0] for x in measure_ids]    }
+        "measure_ids": [x[0] for x in measure_ids]}
     return response_data
 
 
@@ -7989,31 +7931,32 @@ async def delete_model(model_id: int, database: Session = Depends(get_db)):
     database.commit()
     return db_model
 
+
 @app.post("/model/{model_id}/evalu/{evaluation_id}/", response_model=None, tags=["Model Relationships"])
 async def add_evalu_to_model(model_id: int, evaluation_id: int, database: Session = Depends(get_db)):
     """Add a Evaluation to this Model's evalu relationship"""
     db_model = database.query(Model).filter(Model.id == model_id).first()
     if db_model is None:
         raise HTTPException(status_code=404, detail="Model not found")
-    
+
     db_evaluation = database.query(Evaluation).filter(Evaluation.id == evaluation_id).first()
     if db_evaluation is None:
         raise HTTPException(status_code=404, detail="Evaluation not found")
-    
+
     # Check if relationship already exists
     existing = database.query(evaluates_eval).filter(
         (evaluates_eval.c.evaluates == model_id) &
         (evaluates_eval.c.evalu == evaluation_id)
     ).first()
-    
+
     if existing:
         raise HTTPException(status_code=400, detail="Relationship already exists")
-    
+
     # Create the association
     association = evaluates_eval.insert().values(evaluates=model_id, evalu=evaluation_id)
     database.execute(association)
     database.commit()
-    
+
     return {"message": "Evaluation added to evalu successfully"}
 
 
@@ -8023,16 +7966,16 @@ async def remove_evalu_from_model(model_id: int, evaluation_id: int, database: S
     db_model = database.query(Model).filter(Model.id == model_id).first()
     if db_model is None:
         raise HTTPException(status_code=404, detail="Model not found")
-    
+
     # Check if relationship exists
     existing = database.query(evaluates_eval).filter(
         (evaluates_eval.c.evaluates == model_id) &
         (evaluates_eval.c.evalu == evaluation_id)
     ).first()
-    
+
     if not existing:
         raise HTTPException(status_code=404, detail="Relationship not found")
-    
+
     # Delete the association
     association = evaluates_eval.delete().where(
         (evaluates_eval.c.evaluates == model_id) &
@@ -8040,7 +7983,7 @@ async def remove_evalu_from_model(model_id: int, evaluation_id: int, database: S
     )
     database.execute(association)
     database.commit()
-    
+
     return {"message": "Evaluation removed from evalu successfully"}
 
 
@@ -8050,15 +7993,16 @@ async def get_evalu_of_model(model_id: int, database: Session = Depends(get_db))
     db_model = database.query(Model).filter(Model.id == model_id).first()
     if db_model is None:
         raise HTTPException(status_code=404, detail="Model not found")
-    
+
     evaluation_ids = database.query(evaluates_eval.c.evalu).filter(evaluates_eval.c.evaluates == model_id).all()
     evaluation_list = database.query(Evaluation).filter(Evaluation.id.in_([id[0] for id in evaluation_ids])).all()
-    
+
     return {
         "model_id": model_id,
         "evalu_count": len(evaluation_list),
         "evalu": evaluation_list
     }
+
 
 @app.post("/model/{model_id}/eval/{evaluation_id}/", response_model=None, tags=["Model Relationships"])
 async def add_eval_to_model(model_id: int, evaluation_id: int, database: Session = Depends(get_db)):
@@ -8066,25 +8010,25 @@ async def add_eval_to_model(model_id: int, evaluation_id: int, database: Session
     db_model = database.query(Model).filter(Model.id == model_id).first()
     if db_model is None:
         raise HTTPException(status_code=404, detail="Model not found")
-    
+
     db_evaluation = database.query(Evaluation).filter(Evaluation.id == evaluation_id).first()
     if db_evaluation is None:
         raise HTTPException(status_code=404, detail="Evaluation not found")
-    
+
     # Check if relationship already exists
     existing = database.query(evaluation_element).filter(
         (evaluation_element.c.ref == model_id) &
         (evaluation_element.c.eval == evaluation_id)
     ).first()
-    
+
     if existing:
         raise HTTPException(status_code=400, detail="Relationship already exists")
-    
+
     # Create the association
     association = evaluation_element.insert().values(ref=model_id, eval=evaluation_id)
     database.execute(association)
     database.commit()
-    
+
     return {"message": "Evaluation added to eval successfully"}
 
 
@@ -8094,16 +8038,16 @@ async def remove_eval_from_model(model_id: int, evaluation_id: int, database: Se
     db_model = database.query(Model).filter(Model.id == model_id).first()
     if db_model is None:
         raise HTTPException(status_code=404, detail="Model not found")
-    
+
     # Check if relationship exists
     existing = database.query(evaluation_element).filter(
         (evaluation_element.c.ref == model_id) &
         (evaluation_element.c.eval == evaluation_id)
     ).first()
-    
+
     if not existing:
         raise HTTPException(status_code=404, detail="Relationship not found")
-    
+
     # Delete the association
     association = evaluation_element.delete().where(
         (evaluation_element.c.ref == model_id) &
@@ -8111,7 +8055,7 @@ async def remove_eval_from_model(model_id: int, evaluation_id: int, database: Se
     )
     database.execute(association)
     database.commit()
-    
+
     return {"message": "Evaluation removed from eval successfully"}
 
 
@@ -8121,10 +8065,10 @@ async def get_eval_of_model(model_id: int, database: Session = Depends(get_db)):
     db_model = database.query(Model).filter(Model.id == model_id).first()
     if db_model is None:
         raise HTTPException(status_code=404, detail="Model not found")
-    
+
     evaluation_ids = database.query(evaluation_element.c.eval).filter(evaluation_element.c.ref == model_id).all()
     evaluation_list = database.query(Evaluation).filter(Evaluation.id.in_([id[0] for id in evaluation_ids])).all()
-    
+
     return {
         "model_id": model_id,
         "eval_count": len(evaluation_list),
@@ -8132,55 +8076,50 @@ async def get_eval_of_model(model_id: int, database: Session = Depends(get_db)):
     }
 
 
-
-
-
 ############################################
 #
 #   Derived functions
 #
 ############################################
- 
- 
- 
- 
- 
- 
- 
- 
+
 
 @app.get("/derived/", response_model=None, tags=["Derived"])
 def get_all_derived(detailed: bool = False, database: Session = Depends(get_db)) -> list:
     from sqlalchemy.orm import joinedload
-    
+
     # Use detailed=true to get entities with eagerly loaded relationships (for tables with lookup columns)
     if detailed:
         # Eagerly load all relationships to avoid N+1 queries
         query = database.query(Derived)
         derived_list = query.all()
-        
+
         # Serialize with relationships included
         result = []
         for derived_item in derived_list:
             item_dict = derived_item.__dict__.copy()
             item_dict.pop('_sa_instance_state', None)
-            
+
             # Add many-to-one relationships (foreign keys for lookup columns)
-            
+
             # Add many-to-many and one-to-many relationship objects (full details)
-            metric_list = database.query(Metric).join(derived_metric, Metric.id == derived_metric.c.baseMetric).filter(derived_metric.c.derivedBy == derived_item.id).all()
+            metric_list = database.query(Metric).join(derived_metric, Metric.id == derived_metric.c.baseMetric).filter(
+                derived_metric.c.derivedBy == derived_item.id).all()
             item_dict['baseMetric'] = []
             for metric_obj in metric_list:
                 metric_dict = metric_obj.__dict__.copy()
                 metric_dict.pop('_sa_instance_state', None)
                 item_dict['baseMetric'].append(metric_dict)
-            metriccategory_list = database.query(MetricCategory).join(metriccategory_metric, MetricCategory.id == metriccategory_metric.c.category).filter(metriccategory_metric.c.metrics == derived_item.id).all()
+            metriccategory_list = database.query(MetricCategory).join(metriccategory_metric,
+                                                                      MetricCategory.id == metriccategory_metric.c.category).filter(
+                metriccategory_metric.c.metrics == derived_item.id).all()
             item_dict['category'] = []
             for metriccategory_obj in metriccategory_list:
                 metriccategory_dict = metriccategory_obj.__dict__.copy()
                 metriccategory_dict.pop('_sa_instance_state', None)
                 item_dict['category'].append(metriccategory_dict)
-            derived_list = database.query(Derived).join(derived_metric, Derived.id == derived_metric.c.derivedBy).filter(derived_metric.c.baseMetric == derived_item.id).all()
+            derived_list = database.query(Derived).join(derived_metric,
+                                                        Derived.id == derived_metric.c.derivedBy).filter(
+                derived_metric.c.baseMetric == derived_item.id).all()
             item_dict['derivedBy'] = []
             for derived_obj in derived_list:
                 derived_dict = derived_obj.__dict__.copy()
@@ -8192,7 +8131,7 @@ def get_all_derived(detailed: bool = False, database: Session = Depends(get_db))
                 measure_dict = measure_obj.__dict__.copy()
                 measure_dict.pop('_sa_instance_state', None)
                 item_dict['measures'].append(measure_dict)
-            
+
             result.append(item_dict)
         return result
     else:
@@ -8208,7 +8147,8 @@ def get_count_derived(database: Session = Depends(get_db)) -> dict:
 
 
 @app.get("/derived/paginated/", response_model=None, tags=["Derived"])
-def get_paginated_derived(skip: int = 0, limit: int = 100, detailed: bool = False, database: Session = Depends(get_db)) -> dict:
+def get_paginated_derived(skip: int = 0, limit: int = 100, detailed: bool = False,
+                          database: Session = Depends(get_db)) -> dict:
     """Get paginated list of Derived entities"""
     total = database.query(Derived).count()
     derived_list = database.query(Derived).offset(skip).limit(limit).all()
@@ -8221,19 +8161,22 @@ def get_paginated_derived(skip: int = 0, limit: int = 100, detailed: bool = Fals
             "limit": limit,
             "data": derived_list
         }
-    
+
     result = []
     for derived_item in derived_list:
-        metric_ids = database.query(derived_metric.c.baseMetric).filter(derived_metric.c.derivedBy == derived_item.id).all()
-        metriccategory_ids = database.query(metriccategory_metric.c.category).filter(metriccategory_metric.c.metrics == derived_item.id).all()
-        derived_ids = database.query(derived_metric.c.derivedBy).filter(derived_metric.c.baseMetric == derived_item.id).all()
+        metric_ids = database.query(derived_metric.c.baseMetric).filter(
+            derived_metric.c.derivedBy == derived_item.id).all()
+        metriccategory_ids = database.query(metriccategory_metric.c.category).filter(
+            metriccategory_metric.c.metrics == derived_item.id).all()
+        derived_ids = database.query(derived_metric.c.derivedBy).filter(
+            derived_metric.c.baseMetric == derived_item.id).all()
         measures_ids = database.query(Measure.id).filter(Measure.metric_id == derived_item.id).all()
         item_data = {
             "derived": derived_item,
             "metric_ids": [x[0] for x in metric_ids],
             "metriccategory_ids": [x[0] for x in metriccategory_ids],
             "derived_ids": [x[0] for x in derived_ids],
-            "measures_ids": [x[0] for x in measures_ids]        }
+            "measures_ids": [x[0] for x in measures_ids]}
         result.append(item_data)
     return {
         "total": total,
@@ -8245,12 +8188,11 @@ def get_paginated_derived(skip: int = 0, limit: int = 100, detailed: bool = Fals
 
 @app.get("/derived/search/", response_model=None, tags=["Derived"])
 def search_derived(
-    database: Session = Depends(get_db)
+        database: Session = Depends(get_db)
 ) -> list:
     """Search Derived entities by attributes"""
     query = database.query(Derived)
-    
-    
+
     results = query.all()
     return results
 
@@ -8262,7 +8204,8 @@ async def get_derived(derived_id: int, database: Session = Depends(get_db)) -> D
         raise HTTPException(status_code=404, detail="Derived not found")
 
     metric_ids = database.query(derived_metric.c.baseMetric).filter(derived_metric.c.derivedBy == db_derived.id).all()
-    metriccategory_ids = database.query(metriccategory_metric.c.category).filter(metriccategory_metric.c.metrics == db_derived.id).all()
+    metriccategory_ids = database.query(metriccategory_metric.c.category).filter(
+        metriccategory_metric.c.metrics == db_derived.id).all()
     derived_ids = database.query(derived_metric.c.derivedBy).filter(derived_metric.c.baseMetric == db_derived.id).all()
     measures_ids = database.query(Measure.id).filter(Measure.metric_id == db_derived.id).all()
     response_data = {
@@ -8274,10 +8217,8 @@ async def get_derived(derived_id: int, database: Session = Depends(get_db)) -> D
     return response_data
 
 
-
 @app.post("/derived/", response_model=None, tags=["Derived"])
 async def create_derived(derived_data: DerivedCreate, database: Session = Depends(get_db)) -> Derived:
-
     if not derived_data.baseMetric or len(derived_data.baseMetric) < 1:
         raise HTTPException(status_code=400, detail="At least 1 Metric(s) required")
     if derived_data.baseMetric:
@@ -8300,7 +8241,7 @@ async def create_derived(derived_data: DerivedCreate, database: Session = Depend
                 raise HTTPException(status_code=404, detail=f"Derived with ID {id} not found")
 
     db_derived = Derived(
-        expression=derived_data.expression        )
+        expression=derived_data.expression)
 
     database.add(db_derived)
     database.commit()
@@ -8312,7 +8253,7 @@ async def create_derived(derived_data: DerivedCreate, database: Session = Depend
             db_measure = database.query(Measure).filter(Measure.id == measure_id).first()
             if not db_measure:
                 raise HTTPException(status_code=400, detail=f"Measure with id {measure_id} not found")
-        
+
         # Update the related entities with the new foreign key
         database.query(Measure).filter(Measure.id.in_(derived_data.measures)).update(
             {Measure.metric_id: db_derived.id}, synchronize_session=False
@@ -8344,9 +8285,9 @@ async def create_derived(derived_data: DerivedCreate, database: Session = Depend
             database.execute(association)
             database.commit()
 
-    
     metric_ids = database.query(derived_metric.c.baseMetric).filter(derived_metric.c.derivedBy == db_derived.id).all()
-    metriccategory_ids = database.query(metriccategory_metric.c.category).filter(metriccategory_metric.c.metrics == db_derived.id).all()
+    metriccategory_ids = database.query(metriccategory_metric.c.category).filter(
+        metriccategory_metric.c.metrics == db_derived.id).all()
     derived_ids = database.query(derived_metric.c.derivedBy).filter(derived_metric.c.baseMetric == db_derived.id).all()
     measures_ids = database.query(Measure.id).filter(Measure.metric_id == db_derived.id).all()
     response_data = {
@@ -8354,7 +8295,7 @@ async def create_derived(derived_data: DerivedCreate, database: Session = Depend
         "metric_ids": [x[0] for x in metric_ids],
         "metriccategory_ids": [x[0] for x in metriccategory_ids],
         "derived_ids": [x[0] for x in derived_ids],
-        "measures_ids": [x[0] for x in measures_ids]    }
+        "measures_ids": [x[0] for x in measures_ids]}
     return response_data
 
 
@@ -8363,23 +8304,23 @@ async def bulk_create_derived(items: list[DerivedCreate], database: Session = De
     """Create multiple Derived entities at once"""
     created_items = []
     errors = []
-    
+
     for idx, item_data in enumerate(items):
         try:
             # Basic validation for each item
-            
+
             db_derived = Derived(
-                expression=item_data.expression            )
+                expression=item_data.expression)
             database.add(db_derived)
             database.flush()  # Get ID without committing
             created_items.append(db_derived.id)
         except Exception as e:
             errors.append({"index": idx, "error": str(e)})
-    
+
     if errors:
         database.rollback()
         raise HTTPException(status_code=400, detail={"message": "Bulk creation failed", "errors": errors})
-    
+
     database.commit()
     return {
         "created_count": len(created_items),
@@ -8393,7 +8334,7 @@ async def bulk_delete_derived(ids: list[int], database: Session = Depends(get_db
     """Delete multiple Derived entities at once"""
     deleted_count = 0
     not_found = []
-    
+
     for item_id in ids:
         db_derived = database.query(Derived).filter(Derived.id == item_id).first()
         if db_derived:
@@ -8401,14 +8342,15 @@ async def bulk_delete_derived(ids: list[int], database: Session = Depends(get_db
             deleted_count += 1
         else:
             not_found.append(item_id)
-    
+
     database.commit()
-    
+
     return {
         "deleted_count": deleted_count,
         "not_found": not_found,
         "message": f"Successfully deleted {deleted_count} Derived entities"
     }
+
 
 @app.put("/derived/{derived_id}/", response_model=None, tags=["Derived"])
 async def update_derived(derived_id: int, derived_data: DerivedCreate, database: Session = Depends(get_db)) -> Derived:
@@ -8422,7 +8364,7 @@ async def update_derived(derived_id: int, derived_data: DerivedCreate, database:
         database.query(Measure).filter(Measure.metric_id == db_derived.id).update(
             {Measure.metric_id: None}, synchronize_session=False
         )
-        
+
         # Set new relationships if list is not empty
         if derived_data.measures:
             # Validate that all IDs exist
@@ -8430,14 +8372,14 @@ async def update_derived(derived_id: int, derived_data: DerivedCreate, database:
                 db_measure = database.query(Measure).filter(Measure.id == measure_id).first()
                 if not db_measure:
                     raise HTTPException(status_code=400, detail=f"Measure with id {measure_id} not found")
-            
+
             # Update the related entities with the new foreign key
             database.query(Measure).filter(Measure.id.in_(derived_data.measures)).update(
                 {Measure.metric_id: db_derived.id}, synchronize_session=False
             )
     existing_metric_ids = [assoc.baseMetric for assoc in database.execute(
         derived_metric.select().where(derived_metric.c.derivedBy == db_derived.id))]
-    
+
     metrics_to_remove = set(existing_metric_ids) - set(derived_data.baseMetric)
     for metric_id in metrics_to_remove:
         association = derived_metric.delete().where(
@@ -8453,11 +8395,12 @@ async def update_derived(derived_id: int, derived_data: DerivedCreate, database:
         database.execute(association)
     existing_metriccategory_ids = [assoc.category for assoc in database.execute(
         metriccategory_metric.select().where(metriccategory_metric.c.metrics == db_derived.id))]
-    
+
     metriccategorys_to_remove = set(existing_metriccategory_ids) - set(derived_data.category)
     for metriccategory_id in metriccategorys_to_remove:
         association = metriccategory_metric.delete().where(
-            (metriccategory_metric.c.metrics == db_derived.id) & (metriccategory_metric.c.category == metriccategory_id))
+            (metriccategory_metric.c.metrics == db_derived.id) & (
+                        metriccategory_metric.c.category == metriccategory_id))
         database.execute(association)
 
     new_metriccategory_ids = set(derived_data.category) - set(existing_metriccategory_ids)
@@ -8485,9 +8428,10 @@ async def update_derived(derived_id: int, derived_data: DerivedCreate, database:
         database.execute(association)
     database.commit()
     database.refresh(db_derived)
-    
+
     metric_ids = database.query(derived_metric.c.baseMetric).filter(derived_metric.c.derivedBy == db_derived.id).all()
-    metriccategory_ids = database.query(metriccategory_metric.c.category).filter(metriccategory_metric.c.metrics == db_derived.id).all()
+    metriccategory_ids = database.query(metriccategory_metric.c.category).filter(
+        metriccategory_metric.c.metrics == db_derived.id).all()
     derived_ids = database.query(derived_metric.c.derivedBy).filter(derived_metric.c.baseMetric == db_derived.id).all()
     measures_ids = database.query(Measure.id).filter(Measure.metric_id == db_derived.id).all()
     response_data = {
@@ -8495,7 +8439,7 @@ async def update_derived(derived_id: int, derived_data: DerivedCreate, database:
         "metric_ids": [x[0] for x in metric_ids],
         "metriccategory_ids": [x[0] for x in metriccategory_ids],
         "derived_ids": [x[0] for x in derived_ids],
-        "measures_ids": [x[0] for x in measures_ids]    }
+        "measures_ids": [x[0] for x in measures_ids]}
     return response_data
 
 
@@ -8508,31 +8452,32 @@ async def delete_derived(derived_id: int, database: Session = Depends(get_db)):
     database.commit()
     return db_derived
 
+
 @app.post("/derived/{derived_id}/baseMetric/{metric_id}/", response_model=None, tags=["Derived Relationships"])
 async def add_baseMetric_to_derived(derived_id: int, metric_id: int, database: Session = Depends(get_db)):
     """Add a Metric to this Derived's baseMetric relationship"""
     db_derived = database.query(Derived).filter(Derived.id == derived_id).first()
     if db_derived is None:
         raise HTTPException(status_code=404, detail="Derived not found")
-    
+
     db_metric = database.query(Metric).filter(Metric.id == metric_id).first()
     if db_metric is None:
         raise HTTPException(status_code=404, detail="Metric not found")
-    
+
     # Check if relationship already exists
     existing = database.query(derived_metric).filter(
-        (derived_metric.c.derivedBy == derived_id) & 
+        (derived_metric.c.derivedBy == derived_id) &
         (derived_metric.c.baseMetric == metric_id)
     ).first()
-    
+
     if existing:
         raise HTTPException(status_code=400, detail="Relationship already exists")
-    
+
     # Create the association
     association = derived_metric.insert().values(derivedBy=derived_id, baseMetric=metric_id)
     database.execute(association)
     database.commit()
-    
+
     return {"message": "Metric added to baseMetric successfully"}
 
 
@@ -8542,24 +8487,24 @@ async def remove_baseMetric_from_derived(derived_id: int, metric_id: int, databa
     db_derived = database.query(Derived).filter(Derived.id == derived_id).first()
     if db_derived is None:
         raise HTTPException(status_code=404, detail="Derived not found")
-    
+
     # Check if relationship exists
     existing = database.query(derived_metric).filter(
-        (derived_metric.c.derivedBy == derived_id) & 
+        (derived_metric.c.derivedBy == derived_id) &
         (derived_metric.c.baseMetric == metric_id)
     ).first()
-    
+
     if not existing:
         raise HTTPException(status_code=404, detail="Relationship not found")
-    
+
     # Delete the association
     association = derived_metric.delete().where(
-        (derived_metric.c.derivedBy == derived_id) & 
+        (derived_metric.c.derivedBy == derived_id) &
         (derived_metric.c.baseMetric == metric_id)
     )
     database.execute(association)
     database.commit()
-    
+
     return {"message": "Metric removed from baseMetric successfully"}
 
 
@@ -8569,15 +8514,16 @@ async def get_baseMetric_of_derived(derived_id: int, database: Session = Depends
     db_derived = database.query(Derived).filter(Derived.id == derived_id).first()
     if db_derived is None:
         raise HTTPException(status_code=404, detail="Derived not found")
-    
+
     metric_ids = database.query(derived_metric.c.baseMetric).filter(derived_metric.c.derivedBy == derived_id).all()
     metric_list = database.query(Metric).filter(Metric.id.in_([id[0] for id in metric_ids])).all()
-    
+
     return {
         "derived_id": derived_id,
         "baseMetric_count": len(metric_list),
         "baseMetric": metric_list
     }
+
 
 @app.post("/derived/{derived_id}/category/{metriccategory_id}/", response_model=None, tags=["Derived Relationships"])
 async def add_category_to_derived(derived_id: int, metriccategory_id: int, database: Session = Depends(get_db)):
@@ -8585,25 +8531,25 @@ async def add_category_to_derived(derived_id: int, metriccategory_id: int, datab
     db_derived = database.query(Derived).filter(Derived.id == derived_id).first()
     if db_derived is None:
         raise HTTPException(status_code=404, detail="Derived not found")
-    
+
     db_metriccategory = database.query(MetricCategory).filter(MetricCategory.id == metriccategory_id).first()
     if db_metriccategory is None:
         raise HTTPException(status_code=404, detail="MetricCategory not found")
-    
+
     # Check if relationship already exists
     existing = database.query(metriccategory_metric).filter(
-        (metriccategory_metric.c.metrics == derived_id) & 
+        (metriccategory_metric.c.metrics == derived_id) &
         (metriccategory_metric.c.category == metriccategory_id)
     ).first()
-    
+
     if existing:
         raise HTTPException(status_code=400, detail="Relationship already exists")
-    
+
     # Create the association
     association = metriccategory_metric.insert().values(metrics=derived_id, category=metriccategory_id)
     database.execute(association)
     database.commit()
-    
+
     return {"message": "MetricCategory added to category successfully"}
 
 
@@ -8613,24 +8559,24 @@ async def remove_category_from_derived(derived_id: int, metriccategory_id: int, 
     db_derived = database.query(Derived).filter(Derived.id == derived_id).first()
     if db_derived is None:
         raise HTTPException(status_code=404, detail="Derived not found")
-    
+
     # Check if relationship exists
     existing = database.query(metriccategory_metric).filter(
-        (metriccategory_metric.c.metrics == derived_id) & 
+        (metriccategory_metric.c.metrics == derived_id) &
         (metriccategory_metric.c.category == metriccategory_id)
     ).first()
-    
+
     if not existing:
         raise HTTPException(status_code=404, detail="Relationship not found")
-    
+
     # Delete the association
     association = metriccategory_metric.delete().where(
-        (metriccategory_metric.c.metrics == derived_id) & 
+        (metriccategory_metric.c.metrics == derived_id) &
         (metriccategory_metric.c.category == metriccategory_id)
     )
     database.execute(association)
     database.commit()
-    
+
     return {"message": "MetricCategory removed from category successfully"}
 
 
@@ -8640,15 +8586,18 @@ async def get_category_of_derived(derived_id: int, database: Session = Depends(g
     db_derived = database.query(Derived).filter(Derived.id == derived_id).first()
     if db_derived is None:
         raise HTTPException(status_code=404, detail="Derived not found")
-    
-    metriccategory_ids = database.query(metriccategory_metric.c.category).filter(metriccategory_metric.c.metrics == derived_id).all()
-    metriccategory_list = database.query(MetricCategory).filter(MetricCategory.id.in_([id[0] for id in metriccategory_ids])).all()
-    
+
+    metriccategory_ids = database.query(metriccategory_metric.c.category).filter(
+        metriccategory_metric.c.metrics == derived_id).all()
+    metriccategory_list = database.query(MetricCategory).filter(
+        MetricCategory.id.in_([id[0] for id in metriccategory_ids])).all()
+
     return {
         "derived_id": derived_id,
         "category_count": len(metriccategory_list),
         "category": metriccategory_list
     }
+
 
 @app.post("/derived/{derived_id}/derivedBy/{related_derived_id}/", response_model=None, tags=["Derived Relationships"])
 async def add_derivedBy_to_derived(derived_id: int, related_derived_id: int, database: Session = Depends(get_db)):
@@ -8660,40 +8609,41 @@ async def add_derivedBy_to_derived(derived_id: int, related_derived_id: int, dat
     db_derived = database.query(Derived).filter(Derived.id == related_derived_id).first()
     if db_derived is None:
         raise HTTPException(status_code=404, detail="Derived not found")
-    
+
     # Check if relationship already exists
     existing = database.query(derived_metric).filter(
         (derived_metric.c.baseMetric == derived_id) &
         (derived_metric.c.derivedBy == related_derived_id)
     ).first()
-    
+
     if existing:
         raise HTTPException(status_code=400, detail="Relationship already exists")
-    
+
     # Create the association
     association = derived_metric.insert().values(baseMetric=derived_id, derivedBy=related_derived_id)
     database.execute(association)
     database.commit()
-    
+
     return {"message": "Derived added to derivedBy successfully"}
 
 
-@app.delete("/derived/{derived_id}/derivedBy/{related_derived_id}/", response_model=None, tags=["Derived Relationships"])
+@app.delete("/derived/{derived_id}/derivedBy/{related_derived_id}/", response_model=None,
+            tags=["Derived Relationships"])
 async def remove_derivedBy_from_derived(derived_id: int, related_derived_id: int, database: Session = Depends(get_db)):
     """Remove a Derived from this Derived's derivedBy relationship"""
     db_derived = database.query(Derived).filter(Derived.id == derived_id).first()
     if db_derived is None:
         raise HTTPException(status_code=404, detail="Derived not found")
-    
+
     # Check if relationship exists
     existing = database.query(derived_metric).filter(
         (derived_metric.c.baseMetric == derived_id) &
         (derived_metric.c.derivedBy == related_derived_id)
     ).first()
-    
+
     if not existing:
         raise HTTPException(status_code=404, detail="Relationship not found")
-    
+
     # Delete the association
     association = derived_metric.delete().where(
         (derived_metric.c.baseMetric == derived_id) &
@@ -8701,7 +8651,7 @@ async def remove_derivedBy_from_derived(derived_id: int, related_derived_id: int
     )
     database.execute(association)
     database.commit()
-    
+
     return {"message": "Derived removed from derivedBy successfully"}
 
 
@@ -8711,10 +8661,10 @@ async def get_derivedBy_of_derived(derived_id: int, database: Session = Depends(
     db_derived = database.query(Derived).filter(Derived.id == derived_id).first()
     if db_derived is None:
         raise HTTPException(status_code=404, detail="Derived not found")
-    
+
     derived_ids = database.query(derived_metric.c.derivedBy).filter(derived_metric.c.baseMetric == derived_id).all()
     derived_list = database.query(Derived).filter(Derived.id.in_([id[0] for id in derived_ids])).all()
-    
+
     return {
         "derived_id": derived_id,
         "derivedBy_count": len(derived_list),
@@ -8730,7 +8680,8 @@ BASE_DIR = Path(__file__).resolve().parent
 PDF_PATH = BASE_DIR / "reports.pdf"
 LOGS_TXT_PATH = Path(__file__).resolve().parent / "logs.txt"
 
-@app.get("/download/reports",  tags=["Download"])
+
+@app.get("/download/reports", tags=["Download"])
 def download_reports():
     return FileResponse(str(PDF_PATH), media_type="application/pdf", filename="reports.pdf")
 
@@ -8757,19 +8708,14 @@ from fastapi.responses import StreamingResponse
 import csv
 import io
 
+
 @app.get("/audit/logs/download", tags=["Audit"])
 def download_audit_logs(format: str = Query("csv", enum=["csv", "txt"])):
     rows = immudb_exec("""
-        SELECT
-            tx_id,
-            action,
-            entity,
-            entity_id,
-            payload,
-            created_at
-        FROM comments_audit_v2
-        ORDER BY tx_id ASC
-    """)
+                       SELECT tx_id, action, entity, entity_id, payload, created_at
+                       FROM comments_audit_v2
+                       ORDER BY tx_id ASC
+                       """)
 
     if format == "csv":
         output = io.StringIO()
@@ -8821,6 +8767,7 @@ def download_audit_logs(format: str = Query("csv", enum=["csv", "txt"])):
 ############################################
 if __name__ == "__main__":
     import uvicorn
+
     uvicorn.run(app, host="0.0.0.0", port=8000)
 
     # PSA
