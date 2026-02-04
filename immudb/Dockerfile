@@ -1,6 +1,6 @@
 FROM codenotary/immudb:latest
 
-EXPOSE 3322
-EXPOSE 8080
+EXPOSE 3333
+EXPOSE 8081
 
 CMD ["--auth"]

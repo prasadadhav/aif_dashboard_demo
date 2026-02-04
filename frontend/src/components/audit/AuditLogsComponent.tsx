@@ -58,7 +58,7 @@ export const AuditLogsComponent: React.FC<Props> = ({
 
   const endpoint = dataBinding?.endpoint;
   const backendBase =
-    process.env.REACT_APP_API_URL || "http://localhost:8000";
+    process.env.REACT_APP_API_URL || "http://localhost:8001";
 
   /* ---------------------------------------
    * Fetch + normalize audit logs

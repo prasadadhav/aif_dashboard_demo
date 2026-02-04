@@ -6,31 +6,31 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
     ports:
-      - "3000:3000"
+      - "3001:3001"
     depends_on:
       - backend
     environment:
-      - REACT_APP_API_URL=http://backend:8000
+      - REACT_APP_API_URL=http://backend:8001
 
   backend:
     build:
       context: ./backend
       dockerfile: Dockerfile
     ports:
-      - "8000:8000"
+      - "8001:8001"
     volumes:
-      - sqlite_data:/app/data
+      - sqlite_data_lux:/app/data
 
 
   immudb:
     image: codenotary/immudb:latest
-    container_name: immudb
+    container_name: immudb_1
     command: ["--auth"]
     ports:
-      - "8080:8080"   #  Web Console immudb
-      - "3322:3322"   #  immudb gRPC
+      - "8081:8081"   #  Web Console immudb
+      - "3333:3333"   #  immudb gRPC
     volumes:
-      - immudb_data:/var/lib/immudb
+      - immudb_data:/var/lib/immudb_1
 
 # tests:
 #   build:
@@ -55,10 +55,10 @@ services:
 #   # Volumes montés pour exécuter les tests
 #   volumes:
 #     - ./backend:/app
-#     - sqlite_data:/app/data
+#     - sqlite_data_lux:/app/data
 
 
 volumes:
-  sqlite_data:
+  sqlite_data_lux:
   immudb_data:
 

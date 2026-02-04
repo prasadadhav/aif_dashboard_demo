@@ -305,7 +305,7 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["https://ai-sandbox-dashboard-demo-frontend.onrender.com",
-                   "http://localhost:3000", "*"],  # Or restrict to ["http://localhost:3000"]
+                   "http://localhost:3000", "http://localhost:3001", "*"],  # Or restrict to ["http://localhost:3000"]
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -8768,7 +8768,7 @@ def download_audit_logs(format: str = Query("csv", enum=["csv", "txt"])):
 if __name__ == "__main__":
     import uvicorn
 
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run(app, host="0.0.0.0", port=8001)
 
     # PSA
     import os

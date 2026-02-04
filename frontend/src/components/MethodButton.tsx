@@ -76,7 +76,7 @@ export const MethodButton: React.FC<MethodButtonProps> = ({
   onError,
   className = "",
   style = {},
-  backendUrl = process.env.REACT_APP_API_URL || "http://localhost:8000",
+  backendUrl = process.env.REACT_APP_API_URL || "http://localhost:8001",
 }) => {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<any>(null);
@@ -190,7 +190,7 @@ export const MethodButton: React.FC<MethodButtonProps> = ({
       
       // Show brief success confirmation
       setShowSuccessToast(true);
-      setTimeout(() => setShowSuccessToast(false), 3000);
+      setTimeout(() => setShowSuccessToast(false), 3001);
     } catch (err: any) {
       console.error(`[MethodButton] Error executing method:`, err);
       

@@ -200,7 +200,7 @@ const getSeriesValue = (metricRow: any, seriesCfg: any): number | null => {
         if (seriesWithEndpoints.length > 0) {
           setLoading(true);
           setError(null);
-          const backendBase = process.env.REACT_APP_API_URL || "http://localhost:8000";
+          const backendBase = process.env.REACT_APP_API_URL || "http://localhost:8001";
           
           const fetchPromises = seriesWithEndpoints.map((s: any) => {
             const seriesName = s.name || s.label || "Series";
@@ -245,7 +245,7 @@ const getSeriesValue = (metricRow: any, seriesCfg: any): number | null => {
         setLoading(true);
         setError(null);
         // Always use backend base URL for relative endpoints
-        const backendBase = process.env.REACT_APP_API_URL || "http://localhost:8000";
+        const backendBase = process.env.REACT_APP_API_URL || "http://localhost:8001";
         
         // Check if table has lookup columns - if so, request detailed data with joins
         const hasLookupColumns = component.chart?.columns?.some(
@@ -305,7 +305,7 @@ const getSeriesValue = (metricRow: any, seriesCfg: any): number | null => {
       const source = component.data_sources[0];
       const endpoint = source.endpoint || `/${source.domain?.toLowerCase()}/`;
       if (endpoint) {
-        const backendBase = process.env.REACT_APP_API_URL || "http://localhost:8000";
+        const backendBase = process.env.REACT_APP_API_URL || "http://localhost:8001";
         const url = endpoint.startsWith("/") ? backendBase + endpoint : endpoint;
         axios.get(url)
           .then((res) => {
@@ -432,7 +432,7 @@ const getSeriesValue = (metricRow: any, seriesCfg: any): number | null => {
           instanceSourceTableId={instanceSource}
           className={component.class_list?.join(' ')}
           style={style}
-          backendUrl={process.env.REACT_APP_API_URL || "http://localhost:8000"}
+          backendUrl={process.env.REACT_APP_API_URL || "http://localhost:8001"}
         />
       );
     }
@@ -450,7 +450,7 @@ const getSeriesValue = (metricRow: any, seriesCfg: any): number | null => {
           isClassMethod={methodConfig.is_class_method || false}
           className={component.class_list?.join(' ')}
           style={style}
-          backendUrl={process.env.REACT_APP_API_URL || "http://localhost:8000"}
+          backendUrl={process.env.REACT_APP_API_URL || "http://localhost:8001"}
         />
       );
     }
@@ -464,7 +464,7 @@ const getSeriesValue = (metricRow: any, seriesCfg: any): number | null => {
         const filename = attrs["filename"] || "download.pdf";
 
         if (url) {
-          const backendBase = process.env.REACT_APP_API_URL || "http://localhost:8000";
+          const backendBase = process.env.REACT_APP_API_URL || "http://localhost:8001";
           const fullUrl = url.startsWith("http") ? url : backendBase + url;
           downloadFile(fullUrl, filename);
         } else {

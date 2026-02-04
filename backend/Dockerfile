@@ -20,7 +20,7 @@ RUN wget -q \
 # -------------------------
 # immudb dirs
 # -------------------------
-RUN mkdir -p /var/lib/immudb /app
+RUN mkdir -p /var/lib/immudb_1 /app
 
 # -------------------------
 # Python app
@@ -33,12 +33,12 @@ COPY . .
 # -------------------------
 # Ports
 # -------------------------
-EXPOSE 8000 8080 3322
+EXPOSE 8001 8080 3322
 
 # -------------------------
 # Start immudb + API
 # -------------------------
 CMD ["bash", "-c", "\
-    immudb --dir=/var/lib/immudb --auth & \
+    immudb --dir=/var/lib/immudb_1 --auth & \
     exec python main_api.py \
 "]
